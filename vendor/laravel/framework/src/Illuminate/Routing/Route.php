@@ -2,27 +2,38 @@
 
 namespace Illuminate\Routing;
 
+use BackedEnum;
 use Closure;
 use Illuminate\Container\Container;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Attributes\Controllers\Middleware as MiddlewareAttribute;
 use Illuminate\Routing\Contracts\CallableDispatcher;
 use Illuminate\Routing\Contracts\ControllerDispatcher as ControllerDispatcherContract;
 use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Routing\Matching\HostValidator;
 use Illuminate\Routing\Matching\MethodValidator;
 use Illuminate\Routing\Matching\SchemeValidator;
 use Illuminate\Routing\Matching\UriValidator;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Illuminate\Support\Traits\Conditionable;
 use Illuminate\Support\Traits\Macroable;
+use InvalidArgumentException;
 use Laravel\SerializableClosure\SerializableClosure;
 use LogicException;
+use ReflectionAttribute;
+use ReflectionClass;
+use ReflectionException;
 use Symfony\Component\Routing\Route as SymfonyRoute;
+
+use function Illuminate\Support\enum_value;
 
 class Route
 {
-    use CreatesRegularExpressionRouteConstraints, FiltersControllerMiddleware, Macroable, ResolvesRouteDependencies;
+    use Conditionable, CreatesRegularExpressionRouteConstraints, FiltersControllerMiddleware, Macroable, ResolvesRouteDependencies;
 
     /**
      * The URI pattern the route responds to.
@@ -163,7 +174,6 @@ class Route
      * @param  array|string  $methods
      * @param  string  $uri
      * @param  \Closure|array  $action
-     * @return void
      */
     public function __construct($methods, $uri, $action)
     {
@@ -265,6 +275,8 @@ class Route
      * Get the controller instance for the route.
      *
      * @return mixed
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function getController()
     {
@@ -371,7 +383,7 @@ class Route
         $this->compileRoute();
 
         $this->parameters = (new RouteParameterBinder($this))
-                        ->parameters($request);
+            ->parameters($request);
 
         $this->originalParameters = $this->parameters;
 
@@ -503,11 +515,7 @@ class Route
      */
     public function parameterNames()
     {
-        if (isset($this->parameterNames)) {
-            return $this->parameterNames;
-        }
-
-        return $this->parameterNames = $this->compileParameterNames();
+        return $this->parameterNames ?? $this->parameterNames = $this->compileParameterNames();
     }
 
     /**
@@ -751,13 +759,19 @@ class Route
     /**
      * Get or set the domain for the route.
      *
-     * @param  string|null  $domain
+     * @param  \BackedEnum|string|null  $domain
      * @return $this|string|null
+     *
+     * @throws \InvalidArgumentException
      */
     public function domain($domain = null)
     {
         if (is_null($domain)) {
             return $this->getDomain();
+        }
+
+        if ($domain instanceof BackedEnum && ! is_string($domain = $domain->value)) {
+            throw new InvalidArgumentException('Enum must be string backed.');
         }
 
         $parsed = RouteUri::parse($domain);
@@ -779,7 +793,8 @@ class Route
     public function getDomain()
     {
         return isset($this->action['domain'])
-                ? str_replace(['http://', 'https://'], '', $this->action['domain']) : null;
+            ? str_replace(['http://', 'https://'], '', $this->action['domain'])
+            : null;
     }
 
     /**
@@ -795,7 +810,7 @@ class Route
     /**
      * Add a prefix to the route URI.
      *
-     * @param  string  $prefix
+     * @param  string|null  $prefix
      * @return $this
      */
     public function prefix($prefix)
@@ -873,11 +888,17 @@ class Route
     /**
      * Add or change the route name.
      *
-     * @param  string  $name
+     * @param  \BackedEnum|string  $name
      * @return $this
+     *
+     * @throws \InvalidArgumentException
      */
     public function name($name)
     {
+        if ($name instanceof BackedEnum && ! is_string($name = $name->value)) {
+            throw new InvalidArgumentException('Enum must be string backed.');
+        }
+
         $this->action['as'] = isset($this->action['as']) ? $this->action['as'].$name : $name;
 
         return $this;
@@ -986,6 +1007,12 @@ class Route
             $this->domain($this->action['domain']);
         }
 
+        if (isset($this->action['can'])) {
+            foreach ($this->action['can'] as $can) {
+                $this->can($can[0], $can[1] ?? []);
+            }
+        }
+
         return $this;
     }
 
@@ -1040,7 +1067,7 @@ class Route
      * Get or set the middlewares attached to the route.
      *
      * @param  array|string|null  $middleware
-     * @return $this|array
+     * @return ($middleware is null ? array : $this)
      */
     public function middleware($middleware = null)
     {
@@ -1066,15 +1093,17 @@ class Route
     /**
      * Specify that the "Authorize" / "can" middleware should be applied to the route with the given options.
      *
-     * @param  string  $ability
+     * @param  \UnitEnum|string  $ability
      * @param  array|string  $models
      * @return $this
      */
     public function can($ability, $models = [])
     {
+        $ability = enum_value($ability);
+
         return empty($models)
-                    ? $this->middleware(['can:'.$ability])
-                    : $this->middleware(['can:'.$ability.','.implode(',', Arr::wrap($models))]);
+            ? $this->middleware(['can:'.$ability])
+            : $this->middleware(['can:'.$ability.','.implode(',', Arr::wrap($models))]);
     }
 
     /**
@@ -1093,19 +1122,19 @@ class Route
             $this->getControllerMethod(),
         ];
 
-        if (is_a($controllerClass, HasMiddleware::class, true)) {
-            return $this->staticallyProvidedControllerMiddleware(
-                $controllerClass, $controllerMethod
-            );
-        }
+        $attributeMiddleware = $this->attributeProvidedControllerMiddleware($controllerClass, $controllerMethod);
 
-        if (method_exists($controllerClass, 'getMiddleware')) {
-            return $this->controllerDispatcher()->getMiddleware(
-                $this->getController(), $controllerMethod
-            );
-        }
-
-        return [];
+        return match (true) {
+            is_a($controllerClass, HasMiddleware::class, true) => array_merge(
+                $this->staticallyProvidedControllerMiddleware($controllerClass, $controllerMethod),
+                $attributeMiddleware,
+            ),
+            method_exists($controllerClass, 'getMiddleware') => array_merge(
+                $this->controllerDispatcher()->getMiddleware($this->getController(), $controllerMethod),
+                $attributeMiddleware,
+            ),
+            default => $attributeMiddleware,
+        };
     }
 
     /**
@@ -1117,11 +1146,66 @@ class Route
      */
     protected function staticallyProvidedControllerMiddleware(string $class, string $method)
     {
-        return collect($class::middleware())->reject(function ($middleware) use ($method) {
+        return (new Collection($class::middleware()))
+            ->map(function ($middleware) {
+                return $middleware instanceof Middleware
+                    ? $middleware
+                    : new Middleware($middleware);
+            })
+            ->reject(function ($middleware) use ($method) {
+                return static::methodExcludedByOptions(
+                    $method, ['only' => $middleware->only, 'except' => $middleware->except],
+                );
+            })
+            ->map
+            ->middleware
+            ->flatten()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Get the attribute provided controller middleware for the given class and method.
+     *
+     * @return array
+     */
+    protected function attributeProvidedControllerMiddleware(string $class, string $method)
+    {
+        try {
+            $reflectionClass = new ReflectionClass($class);
+            $reflectionMethod = $reflectionClass->getMethod($method);
+        } catch (ReflectionException) {
+            return [];
+        }
+
+        $attributes = new Collection;
+
+        $current = $reflectionClass;
+
+        while ($current) {
+            $classAttributes = array_reverse($current->getAttributes(
+                MiddlewareAttribute::class, ReflectionAttribute::IS_INSTANCEOF
+            ));
+
+            foreach ($classAttributes as $attribute) {
+                $attributes->prepend($attribute);
+            }
+
+            $current = $current->getParentClass();
+        }
+
+        return $attributes->merge(
+            $reflectionMethod->getAttributes(MiddlewareAttribute::class, ReflectionAttribute::IS_INSTANCEOF)
+        )->map(function (ReflectionAttribute $attribute) use ($method) {
+            $instance = $attribute->newInstance();
+
             return static::methodExcludedByOptions(
-                $method, ['only' => $middleware->only, 'except' => $middleware->except]
-            );
-        })->map->middleware->values()->all();
+                $method, ['only' => $instance->only, 'except' => $instance->except],
+            ) ? null : $instance->middleware;
+        })
+            ->filter()
+            ->values()
+            ->all();
     }
 
     /**
@@ -1242,6 +1326,8 @@ class Route
      * Get the dispatcher for the route's controller.
      *
      * @return \Illuminate\Routing\Contracts\ControllerDispatcher
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     public function controllerDispatcher()
     {
@@ -1259,14 +1345,10 @@ class Route
      */
     public static function getValidators()
     {
-        if (isset(static::$validators)) {
-            return static::$validators;
-        }
-
         // To match the route, we will use a chain of responsibility pattern with the
         // validator implementations. We will spin through each one making sure it
         // passes and then we will know if the route as a whole matches request.
-        return static::$validators = [
+        return static::$validators ?? static::$validators = [
             new UriValidator, new MethodValidator,
             new SchemeValidator, new HostValidator,
         ];
@@ -1289,9 +1371,9 @@ class Route
     /**
      * Get the optional parameter names for the route.
      *
-     * @return array
+     * @return array<string, null>
      */
-    protected function getOptionalParameterNames()
+    public function getOptionalParameterNames()
     {
         preg_match_all('/\{(\w+?)\?\}/', $this->uri(), $matches);
 

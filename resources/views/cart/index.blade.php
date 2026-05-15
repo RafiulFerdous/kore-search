@@ -21,7 +21,10 @@
     @else
         <div class="cart-layout">
             <div class="cart-items">
-                <h2 class="cart-heading">{{ $courses->count() }} Course{{ $courses->count() !== 1 ? 's' : '' }} in Cart</h2>
+                <div class="cart-heading-row">
+                    <h2 class="cart-heading">{{ $courses->count() }} Course{{ $courses->count() !== 1 ? 's' : '' }} in Cart</h2>
+                    <button class="btn-clear-cart" title="Clear all items">Clear All</button>
+                </div>
 
                 @foreach($courses as $course)
                     <div class="cart-item" data-course-id="{{ $course->id }}">

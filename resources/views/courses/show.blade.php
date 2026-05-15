@@ -43,12 +43,19 @@
                         <div class="course-show-price">৳{{ number_format($course->price) }}</div>
                     @endif
 
+                    @php $inCart = $course->isInCart(); @endphp
                     <div class="course-show-actions">
                         <button
-                            class="btn btn-accent btn-block btn-add-cart"
+                            class="btn btn-accent btn-block btn-add-cart{{ $inCart ? ' in-cart' : '' }}"
                             data-course-id="{{ $course->id }}"
+                            {{ $inCart ? 'disabled' : '' }}
                         >
-                            Add to Cart
+                            @if($inCart)
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                Added to Cart
+                            @else
+                                Add to Cart
+                            @endif
                         </button>
                         <a href="{{ route('cart.index') }}" class="btn btn-outline btn-block mt-sm">
                             Go to Cart

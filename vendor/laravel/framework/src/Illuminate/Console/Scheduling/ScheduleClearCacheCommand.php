@@ -3,7 +3,9 @@
 namespace Illuminate\Console\Scheduling;
 
 use Illuminate\Console\Command;
+use Symfony\Component\Console\Attribute\AsCommand;
 
+#[AsCommand(name: 'schedule:clear-cache')]
 class ScheduleClearCacheCommand extends Command
 {
     /**
@@ -30,7 +32,7 @@ class ScheduleClearCacheCommand extends Command
     {
         $mutexCleared = false;
 
-        foreach ($schedule->events($this->laravel) as $event) {
+        foreach ($schedule->events() as $event) {
             if ($event->mutex->exists($event)) {
                 $this->components->info(sprintf('Deleting mutex for [%s]', $event->command));
 

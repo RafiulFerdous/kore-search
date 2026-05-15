@@ -26,6 +26,7 @@ Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
 Route::middleware(['auth'])->group(function () {
     Route::post('/cart/add/{course}', [CartController::class, 'add'])->name('cart.add');
     Route::delete('/cart/remove/{course}', [CartController::class, 'remove'])->name('cart.remove');
+    Route::delete('/cart', [CartController::class, 'clearAll'])->name('cart.clear');
 
     Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout.index');
     Route::post('/checkout', [CheckoutController::class, 'process'])->name('checkout.process');

@@ -36,7 +36,7 @@ class ChannelListCommand extends Command
     /**
      * Execute the console command.
      *
-     * @param  \Illuminate\Contracts\Broadcasting\Broadcaster
+     * @param  \Illuminate\Contracts\Broadcasting\Broadcaster  $broadcaster
      * @return void
      */
     public function handle(Broadcaster $broadcaster)
@@ -78,7 +78,7 @@ class ChannelListCommand extends Command
             return mb_strlen($channelName);
         });
 
-        $terminalWidth = $this->getTerminalWidth();
+        $terminalWidth = self::getTerminalWidth();
 
         $channelCount = $this->determineChannelCountOutput($channels, $terminalWidth);
 

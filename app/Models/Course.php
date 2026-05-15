@@ -72,4 +72,9 @@ class Course extends Model
             ->where('status', 'completed')
             ->exists();
     }
+
+    public function isInCart(): bool
+    {
+        return in_array($this->id, session()->get('cart', []));
+    }
 }

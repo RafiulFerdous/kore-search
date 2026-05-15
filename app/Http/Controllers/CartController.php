@@ -85,4 +85,19 @@ class CartController extends Controller
 
         return redirect()->route('cart.index')->with('success', 'Course removed from cart.');
     }
+
+    public function clearAll(Request $request)
+    {
+        session()->forget(['cart', 'cart_prices']);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'count'   => 0,
+                'message' => 'Cart cleared.',
+            ]);
+        }
+
+        return redirect()->route('cart.index')->with('success', 'Cart cleared.');
+    }
 }

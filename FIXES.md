@@ -495,9 +495,111 @@ is disabled during the request with "Adding…" text.
 | `.btn-view-link` | Icon-only external link button in footer |
 | `.course-card-footer .btn-add-cart` | Scoped add-to-cart button (does not affect course show page) |
 
-### Files changed
+### 13.4 Duplicate Cart Prevention & Button State
+
+Two bugs fixed:
+
+**Bug 1 — JS error on 422 responses**: `cartRequest()` threw on any non-2xx
+response, so "already in cart" errors (HTTP 422 with JSON body) showed a
+generic "Something went wrong." toast. Fixed by parsing JSON regardless of
+status and using the server's own message. Also added `fail` callback so
+the button text is restored on error (instead of staying stuck on "Adding…").
+
+**Bug 2 — No visual indication of cart state**: Cards always showed "Add to
+Cart" even for courses already in the cart. The initial fix used View Composer
+`$cartIds` prop passing, but Blade component data inheritance is unreliable.
+Replaced with a `Course::isInCart()` model method that reads the session
+directly — no View Composer dependency needed.
+
+**Cart state check** — `app/Models/Course.php`:
+
+```php
+public function isInCart(): bool
+{
+    return in_array($this->id, session()->get('cart', []));
+}
+```
+
+This is used in three places:
+
+1. `course-card.blade.php` — `$course->isInCart()` renders button as disabled
+   "Added to Cart" (green checkmark) or active "Add to Cart" (cart icon).
+
+2. `courses/show.blade.php` — same check on the sidebar purchase button.
+
+3. `application.js` — `markInCart()` switches button client-side on AJAX
+   success; remove handler reverts card buttons on AJAX remove.
+
+Additional client-side protections:
+- Click handler checks `if (addBtn.disabled) return;` — ignores clicks on
+  disabled buttons.
+- `cartRequest()` now accepts a `fail` callback to restore button state on
+  error (restores the "Add to Cart" icon + text after a failed request).
 
 | File | Change |
 |------|--------|
-| `resources/views/components/course-card.blade.php` | Added add-to-cart button, redesigned layout with overlay, ribbon, top bar, view link |
-| `public/css/app.css` | Complete rewrite of `.course-card*` block, added new classes, removed redundant old `.btn-add-cart` rule |
+| `app/Providers/AppServiceProvider.php` | Added `$cartIds` to the `View::composer('*', ...)` |
+| `resources/views/components/course-card.blade.php` | Server-side `in_array` check; `in-cart` class + disabled state |
+| `resources/views/courses/show.blade.php` | Same server-side check on sidebar add button |
+| `public/js/application.js` | `markInCart()` helper; fixed 422 response handling; card button revert on remove |
+| `public/css/app.css` | `.btn-add-cart.in-cart` styles (green) for both card and show page |
+
+---
+
+## 14. Laravel 10 → 13 Upgrade
+
+Upgraded the project from Laravel 10.50.2 to **Laravel 13.9.0** with
+corresponding package upgrades.
+
+### 14.1 Composer Version Changes
+
+| Package | Before | After |
+|---------|--------|-------|
+| `php` | `^8.1` | `^8.2` |
+| `laravel/framework` | `^10.0` | `^13.0` |
+| `laravel/sanctum` | `^3.0` | `^4.0` |
+| `laravel/tinker` | `^2.0` | `^3.0` |
+| `spatie/laravel-permission` | `^5.0` | `^7.0` |
+| `barryvdh/laravel-debugbar` | `^3.0` | `^4.0` |
+| `nunomaduro/collision` | `^7.0` | `^8.0` |
+| `phpunit/phpunit` | `^10.0` | `^12.0` |
+| `laravel/sail` | `^1.0` | `^1.18` |
+
+### 14.2 Structural Changes (Laravel 11+)
+
+| Removed File | Replacement |
+|-------------|-------------|
+| `app/Http/Kernel.php` | Middleware configured in `bootstrap/app.php` via `->withMiddleware()` |
+| `app/Providers/RouteServiceProvider.php` | Routing in `bootstrap/app.php` via `->withRouting()`; rate limiter moved to `AppServiceProvider::boot()` |
+| `app/Exceptions/Handler.php` | Exception config in `bootstrap/app.php` via `->withExceptions()` |
+| `app/Console/Kernel.php` | Schedule defined in `routes/console.php` |
+| `app/Providers/AuthServiceProvider.php` | Removed (empty stub, no policies) |
+
+### 14.3 Files Rewritten
+
+| File | Change |
+|------|--------|
+| `bootstrap/app.php` | Replaced old Kernel/ServiceProvider pattern with `Application::configure()` fluent API (`->withRouting()`, `->withMiddleware()`, `->withExceptions()`) |
+| `public/index.php` | Simplified to `(require_once ...)->handleRequest(Request::capture())` |
+| `artisan` | Old `$kernel->handle()` pattern replaced with `$app->handleCommand()` |
+| `config/app.php` | Switched to `ServiceProvider::defaultProviders()->merge([...])` and `Facade::defaultAliases()->merge([...])` — framework providers no longer listed manually |
+| `app/Providers/AppServiceProvider.php` | Added `RateLimiter::for('api', ...)` from old RouteServiceProvider |
+
+### 14.4 Files Created
+
+| File | Purpose |
+|------|---------|
+| `routes/console.php` | Console schedule stub |
+
+### 14.5 Spatie Permission v7
+
+Migration republished via `vendor:publish --tag="permission-migrations"`.
+Re-ran `php artisan migrate:fresh --seed` to rebuild permission tables.
+
+### 14.6 Verification
+
+All commands pass:
+- `php artisan --version` → `Laravel Framework 13.9.0`
+- `php artisan route:list` → 28 routes
+- `php artisan config:cache` / `config:clear` / `cache:clear` / `view:clear` / `route:clear`
+- `php artisan migrate --pretend` → nothing to migrate

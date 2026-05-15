@@ -66,7 +66,7 @@
         return meta ? meta.getAttribute('content') : '';
     }
 
-    function cartRequest(url, method, btn, done) {
+    function cartRequest(url, method, btn, done, fail) {
         var token = csrfToken();
         if (!token) return;
 
@@ -81,36 +81,52 @@
             },
         })
         .then(function (r) {
-            if (!r.ok) throw new Error('Request failed');
-            return r.json();
+            return r.json().then(function (data) {
+                data._ok = r.ok;
+                return data;
+            });
         })
         .then(function (data) {
-            if (data.success) {
+            if (data._ok && data.success) {
                 updateBadge(data.count);
                 showToast(data.message, 'success');
                 if (typeof done === 'function') done(data);
             } else {
                 showToast(data.message || 'Could not complete request.', 'error');
+                if (typeof fail === 'function') fail(data);
             }
         })
         .catch(function () {
             showToast('Something went wrong.', 'error');
+            if (typeof fail === 'function') fail(null);
         })
         .finally(function () {
             btn.disabled = false;
         });
     }
 
+    function markInCart(btn) {
+        btn.classList.add('in-cart');
+        btn.disabled = true;
+        btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Added to Cart';
+    }
+
+    function hasClass(el, cls) {
+        return el.classList.contains(cls);
+    }
+
     document.addEventListener('click', function (e) {
         var addBtn = e.target.closest('.btn-add-cart');
         if (addBtn) {
             e.preventDefault();
+            if (addBtn.disabled) return;
             var courseId = addBtn.getAttribute('data-course-id');
             if (!courseId) return;
-            var origText = addBtn.textContent;
             addBtn.textContent = 'Adding\u2026';
             cartRequest('/cart/add/' + courseId, 'POST', addBtn, function () {
-                addBtn.textContent = origText;
+                markInCart(addBtn);
+            }, function () {
+                addBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg> Add to Cart';
             });
             return;
         }
@@ -136,6 +152,34 @@
                 if (data.count === 0) {
                     updateBadge(0);
                 }
+                var cardBtn = document.querySelector('.course-card[data-course-id="' + courseId + '"] .btn-add-cart');
+                if (cardBtn) {
+                    cardBtn.classList.remove('in-cart');
+                    cardBtn.disabled = false;
+                    cardBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg> Add to Cart';
+                }
+            });
+            return;
+        }
+
+        var clearBtn = e.target.closest('.btn-clear-cart');
+        if (clearBtn) {
+            e.preventDefault();
+            cartRequest('/cart', 'DELETE', clearBtn, function () {
+                var items = document.querySelectorAll('.cart-item');
+                items.forEach(function (item) {
+                    item.style.transition = 'opacity 0.3s ease';
+                    item.style.opacity = '0';
+                });
+                setTimeout(function () {
+                    updateCartSummary();
+                    updateBadge(0);
+                    document.querySelectorAll('.btn-add-cart.in-cart').forEach(function (btn) {
+                        btn.classList.remove('in-cart');
+                        btn.disabled = false;
+                        btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg> Add to Cart';
+                    });
+                }, 300);
             });
             return;
         }

@@ -3,7 +3,6 @@
 namespace Illuminate\Database;
 
 use Exception;
-use Illuminate\Database\PDO\PostgresDriver;
 use Illuminate\Database\Query\Grammars\PostgresGrammar as QueryGrammar;
 use Illuminate\Database\Query\Processors\PostgresProcessor;
 use Illuminate\Database\Schema\Grammars\PostgresGrammar as SchemaGrammar;
@@ -13,6 +12,14 @@ use Illuminate\Filesystem\Filesystem;
 
 class PostgresConnection extends Connection
 {
+    /**
+     * {@inheritdoc}
+     */
+    public function getDriverTitle()
+    {
+        return 'PostgreSQL';
+    }
+
     /**
      * Escape a binary value for safe SQL embedding.
      *
@@ -49,15 +56,34 @@ class PostgresConnection extends Connection
     }
 
     /**
+     * Extract the index and columns that caused a unique constraint violation.
+     *
+     * @param  Exception  $exception
+     * @return array{index: string|null, columns: list<string>}
+     */
+    protected function parseUniqueConstraintViolation(Exception $exception): array
+    {
+        [$index, $columns] = [null, []];
+
+        if (preg_match('#unique constraint "([^"]+)"#i', $message = $exception->getMessage(), $matches)) {
+            $index = $matches[1];
+        }
+
+        if (preg_match('#Key \(([^)]+)\)=#i', $message, $matches)) {
+            $columns = array_map(trim(...), explode(',', $matches[1]));
+        }
+
+        return ['columns' => $columns, 'index' => $index];
+    }
+
+    /**
      * Get the default query grammar instance.
      *
      * @return \Illuminate\Database\Query\Grammars\PostgresGrammar
      */
     protected function getDefaultQueryGrammar()
     {
-        ($grammar = new QueryGrammar)->setConnection($this);
-
-        return $this->withTablePrefix($grammar);
+        return new QueryGrammar($this);
     }
 
     /**
@@ -81,9 +107,7 @@ class PostgresConnection extends Connection
      */
     protected function getDefaultSchemaGrammar()
     {
-        ($grammar = new SchemaGrammar)->setConnection($this);
-
-        return $this->withTablePrefix($grammar);
+        return new SchemaGrammar($this);
     }
 
     /**
@@ -106,15 +130,5 @@ class PostgresConnection extends Connection
     protected function getDefaultPostProcessor()
     {
         return new PostgresProcessor;
-    }
-
-    /**
-     * Get the Doctrine DBAL driver.
-     *
-     * @return \Illuminate\Database\PDO\PostgresDriver
-     */
-    protected function getDoctrineDriver()
-    {
-        return new PostgresDriver;
     }
 }

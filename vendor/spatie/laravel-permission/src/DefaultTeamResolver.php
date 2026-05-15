@@ -9,12 +9,7 @@ class DefaultTeamResolver implements PermissionsTeamResolver
 {
     protected int|string|null $teamId = null;
 
-    /**
-     * Set the team id for teams/groups support, this id is used when querying permissions/roles
-     *
-     * @param  int|string|Model|null  $id
-     */
-    public function setPermissionsTeamId($id): void
+    public function setPermissionsTeamId(int|string|Model|null $id): void
     {
         if ($id instanceof Model) {
             $id = $id->getKey();
