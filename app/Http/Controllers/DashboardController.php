@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Course;
 use App\Models\Order;
 use App\Models\User;
-use App\Http\Controllers\CourseController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -49,16 +48,12 @@ class DashboardController extends Controller
             'is_published'  => true,
         ]);
 
-        CourseController::invalidateCache();
-
         return redirect()->route('dashboard')->with('success', 'Course uploaded successfully.');
     }
 
     public function destroyCourse(Course $course)
     {
         $course->delete();
-
-        CourseController::invalidateCache();
 
         return redirect()->route('dashboard')->with('success', 'Course deleted successfully.');
     }

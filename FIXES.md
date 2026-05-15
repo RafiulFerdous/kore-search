@@ -277,3 +277,51 @@ The auth system in the layout was reviewed:
 - `Auth::user()->name` / `Auth::user()->email` — used in the dropdown header
 - CSRF token in logout form
 All auth logic is properly scoped and working.
+
+---
+
+## 10. Course Model Observer — Automatic Cache Invalidation
+
+### 10.1 Observer
+
+Created `app/Observers/CourseObserver.php` which automatically invalidates the
+course list cache whenever a Course model is saved (created/updated) or deleted:
+
+| Event | Action |
+|-------|--------|
+| `saved()` | `Cache::increment('courses.version')` — busts all list caches |
+| `deleted()` | `Cache::increment('courses.version')` + `Cache::forget('course.' . $course->slug)` — busts list + individual cache |
+
+Using `saved` instead of separate `created`/`updated` ensures both inserts and
+updates bust the cache. This covers all scenarios: dashboard creates, admin
+edits, instructor updates, etc.
+
+### 10.2 Registration
+
+Registered in `app/Providers/AppServiceProvider.php`:
+
+```php
+use App\Models\Course;
+use App\Observers\CourseObserver;
+
+public function boot(): void
+{
+    Course::observe(CourseObserver::class);
+}
+```
+
+### 10.3 Manual Calls Removed
+
+Previously, `DashboardController::storeCourse()` and
+`DashboardController::destroyCourse()` manually called
+`CourseController::invalidateCache()`. These calls have been removed since the
+observer handles it automatically.
+
+The `CourseController::invalidateCache()` static method is kept as a public API
+for any other code that needs to manually bust the cache.
+
+### 10.4 Redis Database Note
+
+The Redis cache store uses database index `1` (configured in
+`config/database.php` under `redis.cache.database`), not `0`. When inspecting
+cache keys with `redis-cli`, use `redis-cli -n 1 KEYS '*'` to see cached data.
