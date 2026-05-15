@@ -17,9 +17,16 @@ class InstructorController extends Controller
         $courses    = Course::with('instructor')->where('instructor_id', $instructor->id)->latest()->get();
         $totalStudents = Order::whereIn('course_id', $courses->pluck('id'))->where('status', 'completed')->distinct('user_id')->count('user_id');
         $totalRevenue  = Order::whereIn('course_id', $courses->pluck('id'))->where('status', 'completed')->sum('amount');
-        $totalEnrollments = $courses->sum('enrolled_count');
 
-        return view('dashboard.instructor.index', compact('courses', 'totalStudents', 'totalRevenue', 'totalEnrollments'));
+        return view('dashboard.instructor.index', compact('courses', 'totalStudents', 'totalRevenue'));
+    }
+
+    public function courses()
+    {
+        $instructor = Auth::user();
+        $courses    = Course::with('instructor')->where('instructor_id', $instructor->id)->latest()->paginate(10);
+
+        return view('dashboard.instructor.courses', compact('courses'));
     }
 
     public function storeCourse(Request $request)
@@ -32,6 +39,13 @@ class InstructorController extends Controller
             'thumbnail'   => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
         ]);
 
+        $slug = Str::slug($request->title);
+        $original = $slug;
+        $counter = 1;
+        while (Course::where('slug', $slug)->exists()) {
+            $slug = $original . '-' . $counter++;
+        }
+
         $thumbnailPath = null;
 
         if ($request->hasFile('thumbnail')) {
@@ -41,7 +55,7 @@ class InstructorController extends Controller
         Course::create([
             'instructor_id' => Auth::id(),
             'title'         => $request->title,
-            'slug'          => Str::slug($request->title),
+            'slug'          => $slug,
             'description'   => $request->description,
             'price'         => $request->price,
             'category'      => $request->category,
@@ -49,7 +63,7 @@ class InstructorController extends Controller
             'is_published'  => true,
         ]);
 
-        return redirect()->route('instructor.dashboard')->with('success', 'Course uploaded successfully.');
+        return redirect()->route('instructor.courses')->with('success', 'Course uploaded successfully.');
     }
 
     public function destroyCourse(Course $course)
@@ -60,6 +74,6 @@ class InstructorController extends Controller
 
         $course->delete();
 
-        return redirect()->route('instructor.dashboard')->with('success', 'Course deleted successfully.');
+        return redirect()->route('instructor.courses')->with('success', 'Course deleted successfully.');
     }
 }

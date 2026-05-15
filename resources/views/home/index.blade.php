@@ -11,27 +11,29 @@
             <p class="hero-subtitle">{{ $hero?->subtitle ?? 'Explore expert-led courses in development, design, and technology. Build the skills employers are looking for — at your own pace.' }}</p>
             <div class="hero-actions">
                 <a href="{{ route('courses.index') }}" class="btn btn-primary btn-lg">Browse Courses</a>
+                @guest
                 <a href="{{ route('register') }}" class="btn btn-outline btn-lg">Get Started Free</a>
+                @endguest
             </div>
             <div class="hero-stats">
                 @if($hero?->stats)
                     @foreach($hero->stats as $stat)
                         <div class="hero-stat">
-                            <strong>{{ $stat['count'] }}</strong>
+                            <strong><span class="hero-stat-count">{{ $stat['count'] }}</span></strong>
                             <span>{{ $stat['label'] }}</span>
                         </div>
                     @endforeach
                 @else
                     <div class="hero-stat">
-                        <strong>540+</strong>
+                        <strong><span class="hero-stat-count">{{ $totalStudents }}</span>+</strong>
                         <span>Students</span>
                     </div>
                     <div class="hero-stat">
-                        <strong>20+</strong>
+                        <strong><span class="hero-stat-count">{{ $totalCourses }}</span>+</strong>
                         <span>Courses</span>
                     </div>
                     <div class="hero-stat">
-                        <strong>10+</strong>
+                        <strong><span class="hero-stat-count">{{ $totalInstructors }}</span>+</strong>
                         <span>Instructors</span>
                     </div>
                 @endif
@@ -50,17 +52,21 @@
             <p class="section-subtitle">Find the right course for your career goals</p>
         </div>
         <div class="categories-grid">
-            @foreach($categories as $category)
-                <a href="{{ route('courses.index', ['category' => $category]) }}" class="category-chip">
-                    <span class="category-icon">
-                        @if($category === 'Backend') 🖥️
-                        @elseif($category === 'Frontend') 🎨
-                        @elseif($category === 'Database') 🗄️
-                        @elseif($category === 'Design') ✏️
-                        @else 📚
-                        @endif
-                    </span>
-                    {{ $category }}
+            @php
+                $catMeta = [
+                    'Backend'  => ['icon' => '🖥️', 'color' => '#1F3864', 'light' => '#D6E4F0'],
+                    'Frontend' => ['icon' => '🎨', 'color' => '#C62828', 'light' => '#FFEBEE'],
+                    'Database' => ['icon' => '🗄️', 'color' => '#2E7D32', 'light' => '#E8F5E9'],
+                    'Design'   => ['icon' => '✏️', 'color' => '#F57F17', 'light' => '#FFF8E1'],
+                    'DevOps'   => ['icon' => '⚙️', 'color' => '#6B21A8', 'light' => '#F3E8FF'],
+                ];
+            @endphp
+            @foreach($categories as $i => $category)
+                @php $meta = $catMeta[$category] ?? ['icon' => '📚', 'color' => '#64748B', 'light' => '#F1F5F9']; @endphp
+                <a href="{{ route('courses.index', ['category' => $category]) }}" class="category-card" style="--cat-color: {{ $meta['color'] }}; --cat-light: {{ $meta['light'] }}; --cat-i: {{ $i }};">
+                    <span class="category-icon-wrap">{{ $meta['icon'] }}</span>
+                    <span class="category-name">{{ $category }}</span>
+                    <span class="category-arrow">→</span>
                 </a>
             @endforeach
         </div>

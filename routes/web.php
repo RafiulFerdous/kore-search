@@ -52,15 +52,25 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/courses', [AdminController::class, 'storeCourse'])->name('courses.store');
         Route::patch('/courses/{course}', [AdminController::class, 'updateCourse'])->name('courses.update');
         Route::delete('/courses/{course}', [AdminController::class, 'destroyCourse'])->name('courses.destroy');
+
+        Route::prefix('settings')->name('settings.')->group(function () {
+            Route::get('/hero', [AdminController::class, 'heroSettings'])->name('hero');
+            Route::patch('/hero', [AdminController::class, 'updateHeroSettings'])->name('hero.update');
+            Route::get('/featured', [AdminController::class, 'featuredSettings'])->name('featured');
+            Route::patch('/featured', [AdminController::class, 'updateFeaturedSettings'])->name('featured.update');
+        });
     });
 
     Route::middleware(['role:instructor'])->prefix('instructor')->name('instructor.')->group(function () {
         Route::get('/dashboard', [InstructorController::class, 'dashboard'])->name('dashboard');
+        Route::get('/courses', [InstructorController::class, 'courses'])->name('courses');
         Route::post('/courses', [InstructorController::class, 'storeCourse'])->name('courses.store');
         Route::delete('/courses/{course}', [InstructorController::class, 'destroyCourse'])->name('courses.destroy');
     });
 
     Route::middleware(['role:student'])->prefix('student')->name('student.')->group(function () {
         Route::get('/dashboard', [StudentController::class, 'dashboard'])->name('dashboard');
+        Route::get('/courses', [StudentController::class, 'courses'])->name('courses');
+        Route::get('/orders', [StudentController::class, 'orders'])->name('orders');
     });
 });
