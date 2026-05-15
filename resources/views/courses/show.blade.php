@@ -112,43 +112,90 @@
                 </div>
             </div>
 
-            @if($canRate)
             <div class="rating-section">
-                <h2 class="section-heading">Rate This Course</h2>
+                <h2 class="section-heading">Reviews</h2>
 
-                <form method="POST" action="{{ route('courses.rate', $course) }}" class="rating-form">
-                    @csrf
+                @if($canRate)
+                    <button class="btn btn-primary btn-rate-trigger" id="rateTrigger">
+                        {{ $userRating ? 'Update Your Rating' : 'Rate This Course' }}
+                    </button>
+                @endif
 
-                    <div class="star-input-group">
-                        <div class="star-input" id="starInput">
-                            @for($i = 5; $i >= 1; $i--)
-                                <input
-                                    type="radio"
-                                    name="rating"
-                                    value="{{ $i }}"
-                                    id="star{{ $i }}"
-                                    {{ $userRating && $userRating->rating == $i ? 'checked' : '' }}
-                                    {{ $userRating ? 'disabled' : '' }}
-                                >
-                                <label for="star{{ $i }}" title="{{ $i }} star{{ $i > 1 ? 's' : '' }}">★</label>
-                            @endfor
+                <div class="reviews-list">
+                    @forelse($reviews as $review)
+                        <div class="review-card">
+                            <div class="review-header">
+                                <span class="review-avatar">{{ strtoupper(substr($review->user->name ?? '?', 0, 1)) }}</span>
+                                <div class="review-user">
+                                    <strong>{{ $review->user->name ?? 'Anonymous' }}</strong>
+                                    <div class="review-stars">
+                                        @for($s = 1; $s <= 5; $s++)
+                                            <span class="review-star {{ $s <= $review->rating ? 'filled' : '' }}">★</span>
+                                        @endfor
+                                    </div>
+                                </div>
+                                <span class="review-date">{{ $review->created_at->format('d M Y') }}</span>
+                            </div>
+                            @if($review->review)
+                                <p class="review-text">{{ $review->review }}</p>
+                            @endif
                         </div>
-                        <span class="star-input-label" id="starLabel">
-                            {{ $userRating ? 'Your rating: ' . $userRating->rating . '/5' : 'Click to rate' }}
-                        </span>
-                    </div>
-
-                    @if($userRating)
-                        <p class="rating-thanks">You rated this course {{ $userRating->rating }}/5. Thank you!</p>
-                    @else
-                        <button type="submit" class="btn btn-primary">Submit Rating</button>
-                    @endif
-                </form>
+                    @empty
+                        <p class="reviews-empty">No reviews yet. Be the first to review!</p>
+                    @endforelse
+                </div>
             </div>
-            @endif
 
         </div>
 
+    </div>
+</div>
+
+<div class="modal-overlay hidden" id="ratingModal">
+    <div class="modal-content">
+        <button class="modal-close" id="modalClose">&times;</button>
+        <h2 class="modal-title">{{ $userRating ? 'Update Your Rating' : 'Rate This Course' }}</h2>
+        <p class="modal-subtitle">{{ $course->title }}</p>
+
+        <form method="POST" action="{{ route('courses.rate', $course) }}" class="rating-form" id="ratingForm">
+            @csrf
+
+            <div class="star-input-group">
+                <div class="star-input" id="starInput">
+                    @for($i = 5; $i >= 1; $i--)
+                        <input
+                            type="radio"
+                            name="rating"
+                            value="{{ $i }}"
+                            id="modalStar{{ $i }}"
+                            {{ $userRating && $userRating->rating == $i ? 'checked' : '' }}
+                            required
+                        >
+                        <label for="modalStar{{ $i }}" title="{{ $i }} star{{ $i > 1 ? 's' : '' }}">★</label>
+                    @endfor
+                </div>
+                <span class="star-input-label" id="modalStarLabel">
+                    {{ $userRating ? 'Your rating: ' . $userRating->rating . '/5' : 'Click to rate' }}
+                </span>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="review">Write a review (optional)</label>
+                <textarea
+                    name="review"
+                    id="review"
+                    class="form-textarea"
+                    rows="4"
+                    maxlength="1000"
+                    placeholder="Share your experience with this course..."
+                >{{ $userRating->review ?? '' }}</textarea>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn btn-outline" id="modalCancel">Cancel</button>
+                <button type="submit" class="btn btn-primary">{{ $userRating ? 'Update' : 'Submit' }}</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -157,19 +204,50 @@
 @push('scripts')
 <script>
 (function() {
-    var stars = document.querySelectorAll('.star-input label');
-    var label = document.getElementById('starLabel');
+    var modal = document.getElementById('ratingModal');
+    var trigger = document.getElementById('rateTrigger');
+    var close = document.getElementById('modalClose');
+    var cancel = document.getElementById('modalCancel');
+    var stars = document.querySelectorAll('#starInput label');
+    var starLabel = document.getElementById('modalStarLabel');
 
-    if (stars.length && label) {
+    if (trigger && modal) {
+        trigger.addEventListener('click', function() {
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        });
+    }
+
+    function closeModal() {
+        if (modal) {
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+    }
+
+    if (close) close.addEventListener('click', closeModal);
+    if (cancel) cancel.addEventListener('click', closeModal);
+
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) closeModal();
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+        });
+    }
+
+    if (stars.length && starLabel) {
         stars.forEach(function(star) {
             star.addEventListener('mouseenter', function() {
-                var val = this.getAttribute('for').replace('star', '');
-                label.textContent = val + '/5';
+                var val = this.getAttribute('for').replace('modalStar', '');
+                starLabel.textContent = val + '/5';
             });
 
             star.addEventListener('mouseleave', function() {
-                var checked = document.querySelector('.star-input input:checked');
-                label.textContent = checked
+                var checked = document.querySelector('#starInput input:checked');
+                starLabel.textContent = checked
                     ? 'Your rating: ' + checked.value + '/5'
                     : 'Click to rate';
             });

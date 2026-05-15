@@ -11,14 +11,51 @@ use Illuminate\Support\Str;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function redirect()
+    {
+        $user = Auth::user();
+
+        if ($user->hasRole('admin')) {
+            return redirect()->route('admin.dashboard');
+        }
+
+        if ($user->hasRole('instructor')) {
+            return redirect()->route('instructor.dashboard');
+        }
+
+        return redirect()->route('student.dashboard');
+    }
+
+    public function adminDashboard()
     {
         $totalUsers = User::count();
         $users      = User::latest()->get();
         $courses    = Course::with('instructor')->latest()->get();
         $orders     = Order::with(['user', 'course'])->orderBy('created_at', 'desc')->get();
 
-        return view('dashboard.index', compact('totalUsers', 'users', 'courses', 'orders'));
+        return view('dashboard.admin.index', compact('totalUsers', 'users', 'courses', 'orders'));
+    }
+
+    public function instructorDashboard()
+    {
+        $instructor = Auth::user();
+        $courses    = Course::with('instructor')->where('instructor_id', $instructor->id)->latest()->get();
+        $totalStudents = Order::whereIn('course_id', $courses->pluck('id'))->where('status', 'completed')->distinct('user_id')->count('user_id');
+        $totalRevenue  = Order::whereIn('course_id', $courses->pluck('id'))->where('status', 'completed')->sum('amount');
+        $totalEnrollments = $courses->sum('enrolled_count');
+
+        return view('dashboard.instructor.index', compact('courses', 'totalStudents', 'totalRevenue', 'totalEnrollments'));
+    }
+
+    public function studentDashboard()
+    {
+        $student = Auth::user();
+        $purchasedCourseIds = Order::where('user_id', $student->id)->where('status', 'completed')->pluck('course_id');
+        $courses = Course::whereIn('id', $purchasedCourseIds)->get();
+        $totalSpent = Order::where('user_id', $student->id)->where('status', 'completed')->sum('amount');
+        $recentOrders = Order::with('course')->where('user_id', $student->id)->latest()->take(5)->get();
+
+        return view('dashboard.student.index', compact('courses', 'totalSpent', 'recentOrders'));
     }
 
     public function storeCourse(Request $request)
@@ -48,13 +85,13 @@ class DashboardController extends Controller
             'is_published'  => true,
         ]);
 
-        return redirect()->route('dashboard')->with('success', 'Course uploaded successfully.');
+        return redirect()->route('instructor.dashboard')->with('success', 'Course uploaded successfully.');
     }
 
     public function destroyCourse(Course $course)
     {
         $course->delete();
 
-        return redirect()->route('dashboard')->with('success', 'Course deleted successfully.');
+        return redirect()->route('instructor.dashboard')->with('success', 'Course deleted successfully.');
     }
 }

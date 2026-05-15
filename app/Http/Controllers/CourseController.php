@@ -48,6 +48,7 @@ class CourseController extends Controller
 
         $userRating = null;
         $canRate = false;
+        $reviews = collect();
 
         if (auth()->check()) {
             $user = auth()->user();
@@ -57,7 +58,9 @@ class CourseController extends Controller
             }
         }
 
-        return view('courses.show', compact('course', 'canRate', 'userRating'));
+        $reviews = $course->ratings()->with('user')->whereNotNull('review')->latest()->get();
+
+        return view('courses.show', compact('course', 'canRate', 'userRating', 'reviews'));
     }
 
     public static function invalidateCache(): void

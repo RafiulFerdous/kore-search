@@ -31,10 +31,22 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout.index');
     Route::post('/checkout', [CheckoutController::class, 'process'])->name('checkout.process');
     Route::get('/checkout/confirmation/{order}', [CheckoutController::class, 'confirmation'])->name('checkout.confirmation');
-});
 
-Route::middleware(['auth', 'role:admin'])->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::post('/dashboard/courses', [DashboardController::class, 'storeCourse'])->name('dashboard.courses.store');
-    Route::delete('/dashboard/courses/{course}', [DashboardController::class, 'destroyCourse'])->name('dashboard.courses.destroy');
+    Route::get('/dashboard', [DashboardController::class, 'redirect'])->name('dashboard');
+
+    Route::middleware(['role:admin'])->group(function () {
+        Route::get('/admin/dashboard', [DashboardController::class, 'adminDashboard'])->name('admin.dashboard');
+        Route::post('/admin/courses', [DashboardController::class, 'storeCourse'])->name('admin.courses.store');
+        Route::delete('/admin/courses/{course}', [DashboardController::class, 'destroyCourse'])->name('admin.courses.destroy');
+    });
+
+    Route::middleware(['role:instructor'])->group(function () {
+        Route::get('/instructor/dashboard', [DashboardController::class, 'instructorDashboard'])->name('instructor.dashboard');
+        Route::post('/instructor/courses', [DashboardController::class, 'storeCourse'])->name('instructor.courses.store');
+        Route::delete('/instructor/courses/{course}', [DashboardController::class, 'destroyCourse'])->name('instructor.courses.destroy');
+    });
+
+    Route::middleware(['role:student'])->group(function () {
+        Route::get('/student/dashboard', [DashboardController::class, 'studentDashboard'])->name('student.dashboard');
+    });
 });

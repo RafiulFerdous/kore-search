@@ -15,7 +15,7 @@
             <li><a href="{{ route('home') }}" class="{{ request()->routeIs('home') ? 'active' : '' }}">Home</a></li>
             <li><a href="{{ route('courses.index') }}" class="{{ request()->routeIs('courses.*') ? 'active' : '' }}">Courses</a></li>
             @auth
-                <li><a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard*') ? 'active' : '' }}">Dashboard</a></li>
+                <li><a href="{{ route('dashboard') }}" class="{{ request()->routeIs('*.dashboard') || request()->routeIs('dashboard') ? 'active' : '' }}">Dashboard</a></li>
             @endauth
             <li>
                 <a href="{{ route('cart.index') }}" class="cart-link {{ request()->routeIs('cart.*') ? 'active' : '' }}">
@@ -39,6 +39,7 @@
                             <small>{{ Auth::user()->email }}</small>
                         </div>
                         <a href="{{ route('dashboard') }}">Dashboard</a>
+                        <a href="{{ route('courses.index') }}">Browse Courses</a>
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
                             <button type="submit" class="dropdown-logout">Logout</button>
