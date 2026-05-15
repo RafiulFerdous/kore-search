@@ -151,6 +151,7 @@
     </div>
 </div>
 
+@if($canRate)
 <div class="modal-overlay hidden" id="ratingModal">
     <div class="modal-content">
         <button class="modal-close" id="modalClose">&times;</button>
@@ -188,7 +189,7 @@
                     rows="4"
                     maxlength="1000"
                     placeholder="Share your experience with this course..."
-                >{{ $userRating->review ?? '' }}</textarea>
+                >{{ $userRating ? $userRating->review : '' }}</textarea>
             </div>
 
             <div class="modal-actions">
@@ -198,6 +199,7 @@
         </form>
     </div>
 </div>
+@endif
 
 @endsection
 

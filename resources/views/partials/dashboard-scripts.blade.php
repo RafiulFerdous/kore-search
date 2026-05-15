@@ -15,6 +15,7 @@
 
     links.forEach(function(link) {
         var sectionId = link.getAttribute('data-section');
+        if (!sectionId) return;
         var section = document.getElementById(sectionId);
         if (section) sections[sectionId] = section;
 
