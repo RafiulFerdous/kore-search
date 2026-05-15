@@ -322,6 +322,182 @@ for any other code that needs to manually bust the cache.
 
 ### 10.4 Redis Database Note
 
+## 11. Cart Price Synchronization
+
+### Problem
+
+The cart stored only course IDs in the session. Every price was fetched live from
+the `courses` table at cart/checkout time. If an admin or instructor changed a
+course's price after a student added it to their cart:
+
+| Scenario | Effect |
+|----------|--------|
+| Price increases | User sees & pays higher price at checkout — no warning |
+| Price decreases | User pays less — platform loses revenue |
+
+No price snapshot was taken at add-to-cart time, and the order `amount` always
+reflected whatever `course.price` happened to be at the moment of checkout.
+
+### Fix — Price Snapshot & Change Detection
+
+**1. Snapshot on add** (`CartController@add`):
+
+When a course is added to cart, its current price is stored alongside the cart:
+
+```php
+session()->put('cart_prices.' . $course->id, $course->price);
+```
+
+**2. Cleanup on remove** (`CartController@remove`):
+
+```php
+session()->forget('cart_prices.' . $course->id);
+```
+
+**3. Change detection** (`CartController@index`, `CheckoutController@index`):
+
+On every cart/checkout page load, the snapshot price is compared against the
+live `course.price`. If they differ, the course ID is added to a `$priceChanges`
+array passed to the view:
+
+```php
+$priceChanges[$course->id] = ['old' => $snapshot, 'new' => $course->price];
+```
+
+**4. Visual warning** (cart & checkout views):
+
+When a price change is detected:
+- The original price is shown with a strikethrough
+- The new price appears in red
+- A red "Price Changed" badge is displayed on the cart page
+
+**5. Snapshot honored at checkout** (`CheckoutController@process`):
+
+When creating the order, the snapshot price (`$cartPrices[$course->id]`) is used
+instead of `$course->price`. This ensures the user pays the price they agreed to
+when adding to cart, regardless of subsequent changes.
+
+### 11.1 AJAX Cart Operations
+
+Both add-to-cart and remove-from-cart now use AJAX with no page reload:
+
+- **Add** (`.btn-add-cart`): was already AJAX via the `expectsJson()` branch in
+  `CartController@add`. The JS handler disables the button, shows "Adding…",
+  sends a `POST` via `fetch()`, restores the button, and shows a toast.
+- **Remove** (`.btn-remove-cart`): was a full `<form>` submit with `@method('DELETE')`.
+  Converted to a `<button data-course-id="...">` with a JS click handler that
+  sends a `DELETE` via `fetch()`. On success, the cart item fades out (300ms),
+  is removed from the DOM, the heading count and summary total are recalculated
+  client-side, and the badge updates. If the last item is removed, the cart
+  content is replaced with the empty-cart UI inline — no redirect.
+- **Shared helper** `cartRequest(url, method, btn, done)` in `application.js`
+  handles CSRF token, headers, error toast, badge update, and button state for
+  both operations.
+
+### Files changed
+
+| File | Change |
+|------|--------|
+| `app/Http/Controllers/CartController.php` | Snapshot on add, cleanup on remove, change detection in index |
+| `app/Http/Controllers/CheckoutController.php` | Change detection in index, snapshot price in order creation |
+| `resources/views/cart/index.blade.php` | Show strikethrough old price + red new price + badge |
+| `resources/views/checkout/index.blade.php` | Show strikethrough old price + red new price |
+| `public/css/app.css` | `.old-price`, `.new-price`, `.price-warning-badge`, checkout variants |
+| `public/js/application.js` | `cartRequest()` shared helper, AJAX remove handler with fade-out, empty-cart fallback |
+| `resources/views/cart/index.blade.php` | Form replaced with `<button data-course-id>` for AJAX removal |
+| `app/Http/Controllers/CheckoutController.php` | Also clears `cart_prices` on checkout |
+
+---
+
 The Redis cache store uses database index `1` (configured in
 `config/database.php` under `redis.cache.database`), not `0`. When inspecting
 cache keys with `redis-cli`, use `redis-cli -n 1 KEYS '*'` to see cached data.
+
+---
+
+## 12. Toast Notification System
+
+Replaced the old inline `.alert` flash messages with a centralized toast
+notification system.
+
+### 12.1 Layout (`resources/views/layouts/app.blade.php`)
+
+- Removed three `@if(session(...))` blocks with duplicate `id="flashAlert"` divs
+- Added a `<div id="toastContainer" class="toast-container">` with a `data-flash`
+  JSON attribute that encodes `success`, `error`, `info`, and `warning` session
+  flashes
+
+### 12.2 JavaScript (`public/js/application.js`)
+
+- Added `showToast(message, type)` function that:
+  - Creates animated toast DOM elements with SVG icons per type
+  - Appends to the `#toastContainer`
+  - Auto-dismisses after 4 seconds
+  - Has a close button
+- Reads flash data from `data-flash` attribute on page load and shows each
+- The existing AJAX cart handler now calls `showToast()` instead of the old
+  `showFlash()`
+
+### 12.3 CSS (`public/css/app.css`)
+
+- Replaced old `.alert` / `.alert-success` / `.alert-error` / `.alert-info` /
+  `.alert-close` / `.alert.fade-out` classes (lines 329–378) with new toast
+  classes:
+  - `.toast-container` — fixed top-right, z-index 9999, non-interactive container
+  - `.toast` — base card with shadow, rounded corners, slide-in animation
+  - `.toast-visible` / `.toast-leaving` — entrance/exit transform states
+  - `.toast-success` / `.toast-error` / `.toast-warning` / `.toast-info` —
+    colored left border variants
+  - `.toast-icon` / `.toast-message` / `.toast-close` — inner layout
+
+---
+
+## 13. Course Card Redesign & Add-to-Cart Button
+
+### 13.1 Add-to-Cart Button
+
+Added an "Add to Cart" button to every course card. It uses the existing
+AJAX handler (`.btn-add-cart` → `cartRequest()` in `application.js`):
+
+```blade
+<button class="btn-add-cart" data-course-id="{{ $course->id }}">
+    <svg>...</svg> Add to Cart
+</button>
+```
+
+Hitting the button triggers `POST /cart/add/{id}` via `fetch()` with no page
+reload. The cart badge updates, a toast notification appears, and the button
+is disabled during the request with "Adding…" text.
+
+### 13.2 Visual Redesign
+
+| Element | Before | After |
+|---------|--------|-------|
+| Thumbnail | 180px, no overlay, simple zoom | 190px, gradient overlay on hover (transparent→black), 1.08× zoom |
+| Level badge | Plain badge on thumbnail | Same position, upgraded with subtle box-shadow |
+| Price | In footer next to "View Course" | Moved to a frosted-glass ribbon on the thumbnail (`course-price-ribbon`) |
+| Category | Standalone line above title | Moved to a top bar with duration (`course-card-top`) |
+| Title | Single line | 2-line clamp with ellipsis |
+| Stars & enrolled count | Inline with no separator | Separated by a `•` dot |
+| Footer | Price + "View Course" button | "Add to Cart" button (primary) + icon-only "View" link |
+| Hover | `translateY(-3px)` + shadow | `translateY(-6px)` + deeper shadow |
+| Card shadow | `shadow-sm` | Custom subtle shadow, deeper on hover |
+
+### 13.3 New CSS Classes
+
+| Class | Purpose |
+|-------|---------|
+| `.course-card-overlay` | Gradient overlay on thumbnail, fades in on hover |
+| `.course-price-ribbon` | Frosted-glass price badge at bottom-right of thumbnail |
+| `.course-card-top` | Flex row for category + duration |
+| `.course-duration` | Duration text |
+| `.meta-dot` | Bullet separator between stars and student count |
+| `.btn-view-link` | Icon-only external link button in footer |
+| `.course-card-footer .btn-add-cart` | Scoped add-to-cart button (does not affect course show page) |
+
+### Files changed
+
+| File | Change |
+|------|--------|
+| `resources/views/components/course-card.blade.php` | Added add-to-cart button, redesigned layout with overlay, ribbon, top bar, view link |
+| `public/css/app.css` | Complete rewrite of `.course-card*` block, added new classes, removed redundant old `.btn-add-cart` rule |

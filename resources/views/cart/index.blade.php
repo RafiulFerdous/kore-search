@@ -24,7 +24,7 @@
                 <h2 class="cart-heading">{{ $courses->count() }} Course{{ $courses->count() !== 1 ? 's' : '' }} in Cart</h2>
 
                 @foreach($courses as $course)
-                    <div class="cart-item">
+                    <div class="cart-item" data-course-id="{{ $course->id }}">
                         <img
                             src="{{ $course->thumbnail ?? 'https://placehold.co/120x80' }}"
                             alt="{{ $course->title }}"
@@ -39,17 +39,19 @@
                             <span class="badge badge-{{ $course->level }}">{{ ucfirst($course->level) }}</span>
                         </div>
                         <div class="cart-item-price">
-                            @if($course->isFree())
-                                <span class="price free">Free</span>
+                            @if(isset($priceChanges[$course->id]))
+                                <span class="price old-price">৳{{ number_format($priceChanges[$course->id]['old']) }}</span>
+                                <span class="price new-price">৳{{ number_format($priceChanges[$course->id]['new']) }}</span>
+                                <span class="price-warning-badge">Price Changed</span>
                             @else
-                                <span class="price">৳{{ number_format($course->price) }}</span>
+                                @if($course->isFree())
+                                    <span class="price free">Free</span>
+                                @else
+                                    <span class="price">৳{{ number_format($course->price) }}</span>
+                                @endif
                             @endif
                         </div>
-                        <form method="POST" action="{{ route('cart.remove', $course->id) }}">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="btn-remove-cart" title="Remove">✕</button>
-                        </form>
+                        <button class="btn-remove-cart" data-course-id="{{ $course->id }}" title="Remove" aria-label="Remove">✕</button>
                     </div>
                 @endforeach
             </div>

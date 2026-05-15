@@ -20,7 +20,7 @@
             <li>
                 <a href="{{ route('cart.index') }}" class="cart-link {{ request()->routeIs('cart.*') ? 'active' : '' }}">
                     Cart
-                    <span class="cart-badge" id="cartCount">{{ count(session()->get('cart', [])) }}</span>
+                    <span class="cart-badge" id="cartCount">{{ $cartCount }}</span>
                 </a>
             </li>
             @guest

@@ -15,13 +15,28 @@
                 <span class="conf-label">Order ID</span>
                 <span class="conf-value">#{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }}</span>
             </div>
-            <div class="confirmation-row">
-                <span class="conf-label">Course</span>
-                <span class="conf-value">{{ $order->course->title }}</span>
-            </div>
+
+            @if($orders->count() > 1)
+                <div class="confirmation-row">
+                    <span class="conf-label">Courses</span>
+                    <span class="conf-value">
+                        <ul class="conf-courses-list">
+                            @foreach($orders as $o)
+                                <li>{{ $o->course->title }}</li>
+                            @endforeach
+                        </ul>
+                    </span>
+                </div>
+            @else
+                <div class="confirmation-row">
+                    <span class="conf-label">Course</span>
+                    <span class="conf-value">{{ $order->course->title }}</span>
+                </div>
+            @endif
+
             <div class="confirmation-row">
                 <span class="conf-label">Amount Paid</span>
-                <span class="conf-value">৳{{ number_format($order->amount) }}</span>
+                <span class="conf-value">৳{{ number_format($totalAmount) }}</span>
             </div>
             <div class="confirmation-row">
                 <span class="conf-label">Transaction Number</span>

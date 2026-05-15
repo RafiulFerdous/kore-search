@@ -13,9 +13,10 @@
                 <p class="course-show-desc">{{ $course->description }}</p>
 
                 <div class="course-show-meta">
-                    <div class="star-rating" style="--rating: {{ $course->rating }}">
+                    <div class="star-rating" style="--score: {{ $course->rating }}">
                         <span class="stars-outer"><span class="stars-inner"></span></span>
                         <span class="rating-value">{{ number_format($course->rating, 1) }}</span>
+                        <span class="rating-count">({{ $course->ratings_count ?? 0 }})</span>
                     </div>
                     <span class="meta-sep">·</span>
                     <span>{{ number_format($course->enrolled_count) }} students enrolled</span>
@@ -104,9 +105,69 @@
                 </div>
             </div>
 
+            @if($canRate)
+            <div class="rating-section">
+                <h2 class="section-heading">Rate This Course</h2>
+
+                <form method="POST" action="{{ route('courses.rate', $course) }}" class="rating-form">
+                    @csrf
+
+                    <div class="star-input-group">
+                        <div class="star-input" id="starInput">
+                            @for($i = 5; $i >= 1; $i--)
+                                <input
+                                    type="radio"
+                                    name="rating"
+                                    value="{{ $i }}"
+                                    id="star{{ $i }}"
+                                    {{ $userRating && $userRating->rating == $i ? 'checked' : '' }}
+                                    {{ $userRating ? 'disabled' : '' }}
+                                >
+                                <label for="star{{ $i }}" title="{{ $i }} star{{ $i > 1 ? 's' : '' }}">★</label>
+                            @endfor
+                        </div>
+                        <span class="star-input-label" id="starLabel">
+                            {{ $userRating ? 'Your rating: ' . $userRating->rating . '/5' : 'Click to rate' }}
+                        </span>
+                    </div>
+
+                    @if($userRating)
+                        <p class="rating-thanks">You rated this course {{ $userRating->rating }}/5. Thank you!</p>
+                    @else
+                        <button type="submit" class="btn btn-primary">Submit Rating</button>
+                    @endif
+                </form>
+            </div>
+            @endif
+
         </div>
 
     </div>
 </div>
 
 @endsection
+
+@push('scripts')
+<script>
+(function() {
+    var stars = document.querySelectorAll('.star-input label');
+    var label = document.getElementById('starLabel');
+
+    if (stars.length && label) {
+        stars.forEach(function(star) {
+            star.addEventListener('mouseenter', function() {
+                var val = this.getAttribute('for').replace('star', '');
+                label.textContent = val + '/5';
+            });
+
+            star.addEventListener('mouseleave', function() {
+                var checked = document.querySelector('.star-input input:checked');
+                label.textContent = checked
+                    ? 'Your rating: ' + checked.value + '/5'
+                    : 'Click to rate';
+            });
+        });
+    }
+})();
+</script>
+@endpush

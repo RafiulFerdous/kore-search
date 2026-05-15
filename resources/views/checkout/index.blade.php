@@ -25,14 +25,25 @@
                 @csrf
 
                 <div class="form-group">
-                    <label class="form-label">Select Course</label>
-                    <select name="course_id" class="form-select" required>
+                    <label class="form-label">Courses</label>
+                    <ul class="checkout-courses-list">
                         @foreach($courses as $course)
-                            <option value="{{ $course->id }}">
-                                {{ $course->title }} — ৳{{ number_format($course->price) }}
-                            </option>
+                            <li class="checkout-course-item">
+                                <img src="{{ $course->thumbnail ?? 'https://placehold.co/60x40' }}" alt="" class="checkout-course-thumb">
+                                <span class="checkout-course-title">{{ $course->title }}</span>
+                                <span class="checkout-course-price">
+                                    @if(isset($priceChanges[$course->id]))
+                                        <span class="old-price">৳{{ number_format($priceChanges[$course->id]['old']) }}</span>
+                                        <span class="new-price">৳{{ number_format($priceChanges[$course->id]['new']) }}</span>
+                                    @elseif($course->isFree())
+                                        Free
+                                    @else
+                                        ৳{{ number_format($course->price) }}
+                                    @endif
+                                </span>
+                            </li>
                         @endforeach
-                    </select>
+                    </ul>
                 </div>
 
                 <div class="form-group">
@@ -75,11 +86,7 @@
                     <div class="summary-item-info">
                         <p class="summary-item-title">{{ $course->title }}</p>
                         <p class="summary-item-price">
-                            @if($course->isFree())
-                                Free
-                            @else
-                                ৳{{ number_format($course->price) }}
-                            @endif
+                            @if($course->isFree()) Free @else ৳{{ number_format($course->price) }} @endif
                         </p>
                     </div>
                 </div>

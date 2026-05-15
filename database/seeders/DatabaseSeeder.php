@@ -49,6 +49,8 @@ class DatabaseSeeder extends Seeder
         ]);
         $student->assignRole('student');
 
+        $this->call(CourseSeeder::class);
+
         $courses = [
             [
                 'instructor_id' => $instructor->id,

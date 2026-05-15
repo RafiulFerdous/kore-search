@@ -2,47 +2,37 @@
 
 namespace App\Http\Controllers;
 
+use App\Filters\CourseFilter;
 use App\Models\Course;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
 class CourseController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, CourseFilter $filter)
     {
-        $filters = [
-            'category' => $request->input('category'),
-            'level' => $request->input('level'),
-            'search' => $request->input('search'),
-            'page' => $request->input('page', 1),
-        ];
+        $filters = array_merge(
+            $request->only(['category', 'level', 'search', 'price_min', 'price_max', 'rating']),
+            ['sort' => $request->input('sort', 'newest'), 'page' => $request->input('page', 1)]
+        );
 
         $version = Cache::get('courses.version', 1);
         $cacheKey = 'courses.list.' . $version . '.' . md5(serialize($filters));
 
-        $data = Cache::remember($cacheKey, 3600, function () use ($request) {
-            $query = Course::with('instructor')->where('is_published', true);
+        $data = Cache::remember($cacheKey, 3600, function () use ($request, $filter) {
+            $query = $filter->apply(Course::with('instructor')->where('is_published', true), $request);
+            $query = $filter->applySorting($query, $request);
 
-            if ($request->filled('category')) {
-                $query->where('category', $request->category);
-            }
-
-            if ($request->filled('level')) {
-                $query->where('level', $request->level);
-            }
-
-            if ($request->filled('search')) {
-                $query->where('title', 'like', '%' . $request->search . '%');
-            }
-
-            $courses = $query->latest()->paginate(9);
+            $courses = $query->paginate(9);
 
             $categories = Course::where('is_published', true)
                 ->select('category')
                 ->distinct()
                 ->pluck('category');
 
-            return compact('courses', 'categories');
+            $activeFilters = $filter->activeFilters($request);
+
+            return compact('courses', 'categories', 'activeFilters');
         });
 
         return view('courses.index', $data);
@@ -53,10 +43,21 @@ class CourseController extends Controller
         $cacheKey = 'course.' . $slug;
 
         $course = Cache::remember($cacheKey, 3600, function () use ($slug) {
-            return Course::with('instructor')->where('slug', $slug)->firstOrFail();
+            return Course::with('instructor')->withCount('ratings')->where('slug', $slug)->firstOrFail();
         });
 
-        return view('courses.show', compact('course'));
+        $userRating = null;
+        $canRate = false;
+
+        if (auth()->check()) {
+            $user = auth()->user();
+            $canRate = $user->isStudent() && $course->isPurchasedBy($user);
+            if ($canRate) {
+                $userRating = $course->userRating($user);
+            }
+        }
+
+        return view('courses.show', compact('course', 'canRate', 'userRating'));
     }
 
     public static function invalidateCache(): void

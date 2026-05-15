@@ -16,32 +16,21 @@
 
 <div class="page-wrapper">
 
-    @if(session('success'))
-        <div class="alert alert-success" id="flashAlert">
-            <span>{{ session('success') }}</span>
-            <button class="alert-close" onclick="this.parentElement.remove()">×</button>
-        </div>
-    @endif
-
-    @if(session('error'))
-        <div class="alert alert-error" id="flashAlert">
-            <span>{{ session('error') }}</span>
-            <button class="alert-close" onclick="this.parentElement.remove()">×</button>
-        </div>
-    @endif
-
-    @if(session('info'))
-        <div class="alert alert-info" id="flashAlert">
-            <span>{{ session('info') }}</span>
-            <button class="alert-close" onclick="this.parentElement.remove()">×</button>
-        </div>
-    @endif
-
     @yield('content')
 
 </div>
 
+<div id="toastContainer" class="toast-container"
+     data-flash="{{ json_encode(array_filter([
+        'success' => session('success'),
+        'error'   => session('error'),
+        'info'    => session('info'),
+        'warning' => session('warning'),
+    ])) }}">
+</div>
+
 @include('partials.footer')
 
+@stack('scripts')
 </body>
 </html>
