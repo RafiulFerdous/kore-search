@@ -9,13 +9,18 @@ if [ -n "$PORT" ] && [ "$PORT" != "8080" ]; then
     fi
 fi
 
-# Ensure storage directories exist with proper permissions
-mkdir -p /var/www/html/storage/framework/cache/data
-mkdir -p /var/www/html/storage/framework/sessions
-mkdir -p /var/www/html/storage/framework/views
-mkdir -p /var/www/html/storage/logs
-mkdir -p /var/www/html/storage/debugbar
-mkdir -p /var/www/html/storage/app/public
+# Ensure storage directories exist and are writable by www-data
+for dir in \
+    /var/www/html/storage/framework/cache/data \
+    /var/www/html/storage/framework/sessions \
+    /var/www/html/storage/framework/views \
+    /var/www/html/storage/logs \
+    /var/www/html/storage/debugbar \
+    /var/www/html/storage/app/public; do
+    mkdir -p "$dir"
+    chown www-data:www-data "$dir"
+    chmod 775 "$dir"
+done
 
 # Create storage symlink if missing
 if [ ! -L /var/www/html/public/storage ]; then
