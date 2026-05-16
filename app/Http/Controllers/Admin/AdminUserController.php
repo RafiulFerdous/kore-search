@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class AdminUserController extends Controller
@@ -29,14 +30,20 @@ class AdminUserController extends Controller
             'role'     => ['required', 'in:admin,instructor,student'],
         ]);
 
-        $user = User::create([
-            'name'     => $request->name,
-            'email'    => $request->email,
-            'password' => Hash::make($request->password),
-            'role'     => $request->role,
-        ]);
+        try {
+            DB::transaction(function () use ($request) {
+                $user = User::create([
+                    'name'     => $request->name,
+                    'email'    => $request->email,
+                    'password' => Hash::make($request->password),
+                    'role'     => $request->role,
+                ]);
 
-        $user->syncRoles([$request->role]);
+                $user->syncRoles([$request->role]);
+            });
+        } catch (\Throwable $e) {
+            return redirect()->route('admin.users')->with('error', 'Failed to create user. Please try again.');
+        }
 
         return redirect()->route('admin.users')->with('success', 'User created successfully.');
     }
@@ -51,8 +58,14 @@ class AdminUserController extends Controller
             return back()->with('error', 'You cannot change your own role.');
         }
 
-        $user->update(['role' => $request->role]);
-        $user->syncRoles([$request->role]);
+        try {
+            DB::transaction(function () use ($request, $user) {
+                $user->update(['role' => $request->role]);
+                $user->syncRoles([$request->role]);
+            });
+        } catch (\Throwable $e) {
+            return redirect()->route('admin.users')->with('error', 'Failed to update role. Please try again.');
+        }
 
         return redirect()->route('admin.users')->with('success', "{$user->name}'s role updated to {$request->role}.");
     }
@@ -63,7 +76,11 @@ class AdminUserController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        $user->update(['password' => Hash::make($request->password)]);
+        try {
+            $user->update(['password' => Hash::make($request->password)]);
+        } catch (\Throwable $e) {
+            return redirect()->route('admin.users')->with('error', 'Failed to update password. Please try again.');
+        }
 
         return redirect()->route('admin.users')->with('success', "{$user->name}'s password updated.");
     }
@@ -74,7 +91,13 @@ class AdminUserController extends Controller
             return back()->with('error', 'You cannot delete yourself.');
         }
 
-        $user->delete();
+        try {
+            DB::transaction(function () use ($user) {
+                $user->delete();
+            });
+        } catch (\Throwable $e) {
+            return redirect()->route('admin.users')->with('error', 'Failed to delete user. Please try again.');
+        }
 
         return redirect()->route('admin.users')->with('success', 'User deleted successfully.');
     }

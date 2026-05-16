@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Course;
 use App\Models\CourseRating;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CourseRatingController extends Controller
 {
@@ -19,13 +20,22 @@ class CourseRatingController extends Controller
 
         abort_unless($user->isStudent() && $course->isPurchasedBy($user), 403, 'Only enrolled students can rate this course.');
 
-        CourseRating::updateOrCreate(
-            ['user_id' => $user->id, 'course_id' => $course->id],
-            ['rating' => $request->rating, 'review' => $request->review],
-        );
+        try {
+            DB::beginTransaction();
 
-        $course->recalculateRating();
+            CourseRating::updateOrCreate(
+                ['user_id' => $user->id, 'course_id' => $course->id],
+                ['rating' => $request->rating, 'review' => $request->review],
+            );
 
-        return back()->with('success', 'Your rating has been submitted.');
+            $course->recalculateRating();
+
+            DB::commit();
+
+            return back()->with('success', 'Your rating has been submitted.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to submit rating. Please try again.');
+        }
     }
 }

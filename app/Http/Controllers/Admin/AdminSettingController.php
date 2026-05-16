@@ -9,6 +9,7 @@ use App\Models\HeroSection;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class AdminSettingController extends Controller
 {
@@ -41,25 +42,31 @@ class AdminSettingController extends Controller
             'stats.*.label' => ['nullable', 'string', 'max:50'],
         ]);
 
-        $stats = [];
-        if ($request->filled('stats')) {
-            foreach ($request->stats as $stat) {
-                if (!empty($stat['count']) && !empty($stat['label'])) {
-                    $stats[] = $stat;
+        try {
+            DB::transaction(function () use ($request) {
+                $stats = [];
+                if ($request->filled('stats')) {
+                    foreach ($request->stats as $stat) {
+                        if (!empty($stat['count']) && !empty($stat['label'])) {
+                            $stats[] = $stat;
+                        }
+                    }
                 }
-            }
-        }
 
-        HeroSection::updateOrCreate(
-            ['is_active' => true],
-            [
-                'title'      => $request->title,
-                'subtitle'   => $request->subtitle,
-                'hero_image' => $request->hero_image,
-                'stats'      => $stats,
-                'is_active'  => true,
-            ]
-        );
+                HeroSection::updateOrCreate(
+                    ['is_active' => true],
+                    [
+                        'title'      => $request->title,
+                        'subtitle'   => $request->subtitle,
+                        'hero_image' => $request->hero_image,
+                        'stats'      => $stats,
+                        'is_active'  => true,
+                    ]
+                );
+            });
+        } catch (\Throwable $e) {
+            return redirect()->route('admin.settings.hero')->with('error', 'Failed to update hero section. Please try again.');
+        }
 
         return redirect()->route('admin.settings.hero')->with('success', 'Hero section updated successfully.');
     }
@@ -79,21 +86,27 @@ class AdminSettingController extends Controller
             'course_ids.*' => ['integer', 'exists:courses,id'],
         ]);
 
-        FeaturedSection::updateOrCreate(
-            ['is_active' => true],
-            [
-                'course_ids' => $request->course_ids ?? [],
-                'is_active'  => true,
-            ]
-        );
+        try {
+            DB::transaction(function () use ($request) {
+                FeaturedSection::updateOrCreate(
+                    ['is_active' => true],
+                    [
+                        'course_ids' => $request->course_ids ?? [],
+                        'is_active'  => true,
+                    ]
+                );
 
-        $ids = $request->course_ids ?? [];
-        if (!empty($ids)) {
-            $courses = Course::with('instructor')->whereIn('id', $ids)->where('is_published', true)->latest()->get();
-        } else {
-            $courses = Course::with('instructor')->where('is_published', true)->inRandomOrder()->take(6)->get();
+                $ids = $request->course_ids ?? [];
+                if (!empty($ids)) {
+                    $courses = Course::with('instructor')->whereIn('id', $ids)->where('is_published', true)->latest()->get();
+                } else {
+                    $courses = Course::with('instructor')->where('is_published', true)->inRandomOrder()->take(6)->get();
+                }
+                Cache::put('home.featured_courses', $courses, 3600);
+            });
+        } catch (\Throwable $e) {
+            return redirect()->route('admin.settings.featured')->with('error', 'Failed to update featured courses. Please try again.');
         }
-        Cache::put('home.featured_courses', $courses, 3600);
 
         return redirect()->route('admin.settings.featured')->with('success', 'Featured courses updated successfully.');
     }

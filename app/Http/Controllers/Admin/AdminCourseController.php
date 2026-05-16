@@ -7,6 +7,7 @@ use App\Models\Course;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -38,29 +39,44 @@ class AdminCourseController extends Controller
             'is_published' => ['boolean'],
         ]);
 
-        $topics = $request->filled('topics')
-            ? array_filter(array_map('trim', explode("\n", $request->topics)))
-            : [];
+        try {
+            DB::transaction(function () use ($request) {
+                $topics = $request->filled('topics')
+                    ? array_filter(array_map('trim', explode("\n", $request->topics)))
+                    : [];
 
-        $thumbnailPath = $request->hasFile('thumbnail')
-            ? $request->file('thumbnail')->store('thumbnails', 'public')
-            : null;
+                $slug = Str::slug($request->title);
+                $originalSlug = $slug;
+                $counter = 1;
+                while (Course::where('slug', $slug)->exists()) {
+                    $slug = $originalSlug . '-' . $counter++;
+                }
 
-        Course::create([
-            'instructor_id' => $request->instructor_id,
-            'title'         => $request->title,
-            'slug'          => Str::slug($request->title),
-            'description'   => $request->description,
-            'price'         => $request->price,
-            'category'      => $request->category,
-            'level'         => $request->level,
-            'duration'      => $request->duration,
-            'thumbnail'     => $thumbnailPath,
-            'topics'        => $topics,
-            'is_published'  => $request->boolean('is_published'),
-        ]);
+                $thumbnailPath = $request->hasFile('thumbnail')
+                    ? $request->file('thumbnail')->store('thumbnails', 'public')
+                    : null;
 
-        Cache::increment('admin.courses.version');
+                Course::create([
+                    'instructor_id' => $request->instructor_id,
+                    'title'         => $request->title,
+                    'slug'          => $slug,
+                    'description'   => $request->description,
+                    'price'         => $request->price,
+                    'category'      => $request->category,
+                    'level'         => $request->level,
+                    'duration'      => $request->duration,
+                    'thumbnail'     => $thumbnailPath,
+                    'topics'        => $topics,
+                    'is_published'  => $request->boolean('is_published'),
+                ]);
+
+                Cache::increment('admin.courses.version');
+
+                return true;
+            });
+        } catch (\Throwable $e) {
+            return redirect()->route('admin.courses')->with('error', 'Failed to create course. Please try again.');
+        }
 
         return redirect()->route('admin.courses')->with('success', 'Course created successfully.');
     }
@@ -80,47 +96,68 @@ class AdminCourseController extends Controller
             'is_published' => ['boolean'],
         ]);
 
-        $topics = $request->filled('topics')
-            ? array_filter(array_map('trim', explode("\n", $request->topics)))
-            : [];
+        try {
+            DB::transaction(function () use ($request, $course) {
+                $topics = $request->filled('topics')
+                    ? array_filter(array_map('trim', explode("\n", $request->topics)))
+                    : [];
 
-        $data = [
-            'instructor_id' => $request->instructor_id,
-            'title'         => $request->title,
-            'slug'          => Str::slug($request->title),
-            'description'   => $request->description,
-            'price'         => $request->price,
-            'category'      => $request->category,
-            'level'         => $request->level,
-            'duration'      => $request->duration,
-            'topics'        => $topics,
-            'is_published'  => $request->boolean('is_published'),
-        ];
+                $slug = Str::slug($request->title);
+                $originalSlug = $slug;
+                $counter = 1;
+                while (Course::where('slug', $slug)->where('id', '!=', $course->id)->exists()) {
+                    $slug = $originalSlug . '-' . $counter++;
+                }
 
-        if ($request->hasFile('thumbnail')) {
-            if ($course->thumbnail) {
-                Storage::disk('public')->delete($course->thumbnail);
-            }
-            $data['thumbnail'] = $request->file('thumbnail')->store('thumbnails', 'public');
+                $data = [
+                    'instructor_id' => $request->instructor_id,
+                    'title'         => $request->title,
+                    'slug'          => $slug,
+                    'description'   => $request->description,
+                    'price'         => $request->price,
+                    'category'      => $request->category,
+                    'level'         => $request->level,
+                    'duration'      => $request->duration,
+                    'topics'        => $topics,
+                    'is_published'  => $request->boolean('is_published'),
+                ];
+
+                if ($request->hasFile('thumbnail')) {
+                    if ($course->thumbnail) {
+                        Storage::disk('public')->delete($course->thumbnail);
+                    }
+                    $data['thumbnail'] = $request->file('thumbnail')->store('thumbnails', 'public');
+                }
+
+                $course->update($data);
+
+                Cache::increment('admin.courses.version');
+                Cache::forget('course.' . $course->slug);
+
+                return true;
+            });
+        } catch (\Throwable $e) {
+            return redirect()->route('admin.courses')->with('error', 'Failed to update course. Please try again.');
         }
-
-        $course->update($data);
-
-        Cache::increment('admin.courses.version');
-        Cache::forget('course.' . $course->slug);
 
         return redirect()->route('admin.courses')->with('success', 'Course updated successfully.');
     }
 
     public function destroy(Course $course)
     {
-        if ($course->thumbnail) {
-            Storage::disk('public')->delete($course->thumbnail);
+        try {
+            DB::transaction(function () use ($course) {
+                if ($course->thumbnail) {
+                    Storage::disk('public')->delete($course->thumbnail);
+                }
+
+                $course->delete();
+
+                Cache::increment('admin.courses.version');
+            });
+        } catch (\Throwable $e) {
+            return redirect()->route('admin.courses')->with('error', 'Failed to delete course. Please try again.');
         }
-
-        $course->delete();
-
-        Cache::increment('admin.courses.version');
 
         return redirect()->route('admin.courses')->with('success', 'Course deleted successfully.');
     }

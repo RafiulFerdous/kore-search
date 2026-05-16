@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Cache\RateLimiter;
 
@@ -66,18 +67,27 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'role' => 'student',
-        ]);
+        try {
+            DB::beginTransaction();
 
-        $user->assignRole('student');
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'role' => 'student',
+            ]);
 
-        Auth::login($user);
+            $user->assignRole('student');
 
-        return redirect()->route('home');
+            DB::commit();
+
+            Auth::login($user);
+
+            return redirect()->route('home');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Registration failed. Please try again.')->withInput();
+        }
     }
 
     public function logout(Request $request)

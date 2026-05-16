@@ -7,6 +7,8 @@ use App\Models\Course;
 use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class InstructorController extends Controller
@@ -39,31 +41,43 @@ class InstructorController extends Controller
             'thumbnail'   => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
         ]);
 
-        $slug = Str::slug($request->title);
-        $original = $slug;
-        $counter = 1;
-        while (Course::where('slug', $slug)->exists()) {
-            $slug = $original . '-' . $counter++;
+        try {
+            $slug = Str::slug($request->title);
+            $original = $slug;
+            $counter = 1;
+            while (Course::where('slug', $slug)->exists()) {
+                $slug = $original . '-' . $counter++;
+            }
+
+            $thumbnailPath = null;
+
+            if ($request->hasFile('thumbnail')) {
+                $thumbnailPath = $request->file('thumbnail')->store('thumbnails', 'public');
+            }
+
+            DB::beginTransaction();
+
+            Course::create([
+                'instructor_id' => Auth::id(),
+                'title'         => $request->title,
+                'slug'          => $slug,
+                'description'   => $request->description,
+                'price'         => $request->price,
+                'category'      => $request->category,
+                'thumbnail'     => $thumbnailPath,
+                'is_published'  => true,
+            ]);
+
+            DB::commit();
+
+            return redirect()->route('instructor.courses')->with('success', 'Course uploaded successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            if (isset($thumbnailPath)) {
+                Storage::disk('public')->delete($thumbnailPath);
+            }
+            return back()->with('error', 'Failed to upload course. Please try again.')->withInput();
         }
-
-        $thumbnailPath = null;
-
-        if ($request->hasFile('thumbnail')) {
-            $thumbnailPath = $request->file('thumbnail')->store('thumbnails', 'public');
-        }
-
-        Course::create([
-            'instructor_id' => Auth::id(),
-            'title'         => $request->title,
-            'slug'          => $slug,
-            'description'   => $request->description,
-            'price'         => $request->price,
-            'category'      => $request->category,
-            'thumbnail'     => $thumbnailPath,
-            'is_published'  => true,
-        ]);
-
-        return redirect()->route('instructor.courses')->with('success', 'Course uploaded successfully.');
     }
 
     public function destroyCourse(Course $course)
@@ -72,8 +86,16 @@ class InstructorController extends Controller
             return back()->with('error', 'You can only delete your own courses.');
         }
 
-        $course->delete();
+        try {
+            if ($course->thumbnail) {
+                Storage::disk('public')->delete($course->thumbnail);
+            }
 
-        return redirect()->route('instructor.courses')->with('success', 'Course deleted successfully.');
+            $course->delete();
+
+            return redirect()->route('instructor.courses')->with('success', 'Course deleted successfully.');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to delete course. Please try again.');
+        }
     }
 }

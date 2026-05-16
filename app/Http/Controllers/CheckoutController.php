@@ -6,6 +6,7 @@ use App\Models\Course;
 use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class CheckoutController extends Controller
 {
@@ -46,30 +47,39 @@ class CheckoutController extends Controller
             return redirect()->route('cart.index')->with('error', 'Your cart is empty.');
         }
 
-        $courses = Course::whereIn('id', $cartIds)->get();
-        $cartPrices = session()->get('cart_prices', []);
+        try {
+            $courses = Course::whereIn('id', $cartIds)->get();
+            $cartPrices = session()->get('cart_prices', []);
 
-        foreach ($courses as $course) {
-            $amount = $cartPrices[$course->id] ?? $course->price;
+            DB::beginTransaction();
 
-            Order::create([
-                'user_id'            => Auth::id(),
-                'course_id'          => $course->id,
-                'transaction_number' => $request->transaction_number,
-                'amount'             => $amount,
-                'status'             => 'pending',
-            ]);
+            foreach ($courses as $course) {
+                $amount = $cartPrices[$course->id] ?? $course->price;
+
+                Order::create([
+                    'user_id'            => Auth::id(),
+                    'course_id'          => $course->id,
+                    'transaction_number' => $request->transaction_number,
+                    'amount'             => $amount,
+                    'status'             => 'pending',
+                ]);
+            }
+
+            session()->forget('cart');
+            session()->forget('cart_prices');
+
+            DB::commit();
+
+            $firstOrder = Order::where('user_id', Auth::id())
+                ->where('transaction_number', $request->transaction_number)
+                ->latest()
+                ->first();
+
+            return redirect()->route('checkout.confirmation', $firstOrder->id);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->route('cart.index')->with('error', 'Checkout failed. Please try again.');
         }
-
-        session()->forget('cart');
-        session()->forget('cart_prices');
-
-        $firstOrder = Order::where('user_id', Auth::id())
-            ->where('transaction_number', $request->transaction_number)
-            ->latest()
-            ->first();
-
-        return redirect()->route('checkout.confirmation', $firstOrder->id);
     }
 
     public function confirmation(Order $order)

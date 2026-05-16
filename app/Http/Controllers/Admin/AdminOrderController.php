@@ -21,7 +21,11 @@ class AdminOrderController extends Controller
             'status' => ['required', 'in:pending,completed,failed'],
         ]);
 
-        $order->update(['status' => $request->status]);
+        try {
+            $order->update(['status' => $request->status]);
+        } catch (\Throwable $e) {
+            return redirect()->route('admin.orders')->with('error', 'Failed to update order status. Please try again.');
+        }
 
         return redirect()->route('admin.orders')->with('success', "Order #{$order->id} status updated to {$request->status}.");
     }

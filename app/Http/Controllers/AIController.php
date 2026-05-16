@@ -14,8 +14,11 @@ class AIController extends Controller
             'category' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $details = $ai->suggestDetails($request->title, $request->category);
-
-        return response()->json($details);
+        try {
+            $details = $ai->suggestDetails($request->title, $request->category);
+            return response()->json($details);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'AI generation failed. Please try again.'], 500);
+        }
     }
 }
