@@ -2,14 +2,16 @@ FROM composer:latest AS vendor
 
 WORKDIR /build
 
-COPY composer.json composer.lock ./
-COPY app/helpers.php app/helpers.php
+# copy full project first (important for autoload files like helpers.php)
+COPY . .
+
 RUN composer install \
     --no-dev \
     --no-interaction \
     --no-progress \
     --optimize-autoloader \
     --prefer-dist
+
 
 FROM php:8.3-fpm-alpine
 
@@ -23,7 +25,7 @@ RUN apk add --no-cache \
     oniguruma-dev \
     autoconf \
     build-base \
-    $([ "$(uname -m)" = "x86_64" ] && echo "libxml2-dev") \
+    libxml2-dev \
     && docker-php-ext-install -j$(nproc) \
         pdo_mysql \
         mbstring \
@@ -46,11 +48,13 @@ WORKDIR /var/www/html
 COPY --chown=www-data:www-data . .
 COPY --from=vendor --chown=www-data:www-data /build/vendor vendor
 
+# 🚨 IMPORTANT FIX: clear Laravel cached providers (fix Debugbar crash)
+RUN php artisan optimize:clear || true \
+    && rm -rf bootstrap/cache/*.php
+
 RUN chmod +x /entrypoint.sh \
-    && chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache \
-    && rm -f /var/www/html/bootstrap/cache/packages.php \
-           /var/www/html/bootstrap/cache/services.php
+    && chown -R www-data:www-data storage bootstrap/cache \
+    && chmod -R 775 storage bootstrap/cache
 
 EXPOSE 8080
 
