@@ -38,7 +38,16 @@
                                 <td>{{ $order->course->title ?? '—' }}</td>
                                 <td class="transaction-number">{{ $order->transaction_number }}</td>
                                 <td>৳{{ number_format($order->amount) }}</td>
-                                <td><span class="status-badge status-{{ $order->status }}">{{ ucfirst($order->status) }}</span></td>
+                                <td>
+                                    <form method="POST" action="{{ route('admin.orders.status', $order) }}" class="status-form" style="display:inline">
+                                        @csrf @method('PATCH')
+                                        <select name="status" class="status-select status-{{ $order->status }}" onchange="if(confirm('Change order #{{ $order->id }} status to ' + this.value + '?')) this.form.submit(); else this.value='{{ $order->status }}';">
+                                            <option value="pending" {{ $order->status === 'pending' ? 'selected' : '' }}>Pending</option>
+                                            <option value="completed" {{ $order->status === 'completed' ? 'selected' : '' }}>Completed</option>
+                                            <option value="failed" {{ $order->status === 'failed' ? 'selected' : '' }}>Failed</option>
+                                        </select>
+                                    </form>
+                                </td>
                                 <td>{{ $order->created_at->format('d M Y') }}</td>
                             </tr>
                         @empty

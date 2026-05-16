@@ -60,7 +60,7 @@
                                 </td>
                                 <td>
                                     <div class="action-btns">
-                                        <button class="btn-action btn-action-edit" data-course="{{ $course->toJson() }}" title="Edit Course">✏️</button>
+                                        <button class="btn-action btn-action-edit" data-course='@json($course)' title="Edit Course">✏️</button>
                                         <form method="POST" action="{{ route('admin.courses.destroy', $course) }}" onsubmit="return confirm('Delete course?')" style="display:inline">
                                             @csrf @method('DELETE')
                                             <button type="submit" class="btn-action btn-action-delete" title="Delete Course">🗑️</button>
@@ -167,126 +167,146 @@
 
 <script>
 (function() {
-    var modal = document.getElementById('courseModal');
-    var form = document.getElementById('courseForm');
-    var methodInput = document.getElementById('courseFormMethod');
-    var titleInput = document.getElementById('courseTitle');
-    var categoryInput = document.getElementById('courseCategory');
-    var descInput = document.getElementById('courseDescription');
-    var priceInput = document.getElementById('coursePrice');
-    var instructorSelect = document.getElementById('courseInstructor');
-    var levelInput = document.getElementById('courseLevel');
-    var durationInput = document.getElementById('courseDuration');
-    var topicsInput = document.getElementById('courseTopics');
-    var publishedCheck = document.getElementById('coursePublished');
-    var thumbnailInput = document.getElementById('courseThumbnail');
-    var preview = document.getElementById('courseThumbnailPreview');
-    var previewImg = preview.querySelector('img');
-    var modalTitle = document.getElementById('courseModalTitle');
-    var modalIcon = document.getElementById('courseModalIcon');
-    var submitBtn = document.getElementById('courseModalSubmit');
+    try {
+        var modal = document.getElementById('courseModal');
+        var form = document.getElementById('courseForm');
+        var methodInput = document.getElementById('courseFormMethod');
+        var titleInput = document.getElementById('courseTitle');
+        var categoryInput = document.getElementById('courseCategory');
+        var descInput = document.getElementById('courseDescription');
+        var priceInput = document.getElementById('coursePrice');
+        var instructorSelect = document.getElementById('courseInstructor');
+        var levelInput = document.getElementById('courseLevel');
+        var durationInput = document.getElementById('courseDuration');
+        var topicsInput = document.getElementById('courseTopics');
+        var publishedCheck = document.getElementById('coursePublished');
+        var thumbnailInput = document.getElementById('courseThumbnail');
+        var preview = document.getElementById('courseThumbnailPreview');
+        var previewImg = preview ? preview.querySelector('img') : null;
+        var modalTitle = document.getElementById('courseModalTitle');
+        var modalIcon = document.getElementById('courseModalIcon');
+        var submitBtn = document.getElementById('courseModalSubmit');
 
-    function resetForm() {
-        form.action = '{{ route('admin.courses.store') }}';
-        methodInput.value = 'POST';
-        form.querySelectorAll('input, textarea, select').forEach(function(el) {
-            if (el.type === 'checkbox') el.checked = el.defaultChecked;
-            else if (el.type === 'file')
-            else el.value = '';
-        });
-        instructorSelect.value = '';
-        preview.style.display = 'none';
-        previewImg.src = '';
-        modalTitle.textContent = 'Create Course';
-        modalIcon.textContent = '📚';
-        submitBtn.textContent = 'Create Course';
-    }
+        if (!modal || !form || !methodInput) return;
 
-    function fillForm(course) {
-        form.action = '/admin/courses/' + course.id;
-        methodInput.value = 'PATCH';
-        titleInput.value = course.title;
-        categoryInput.value = course.category;
-        descInput.value = course.description;
-        priceInput.value = course.price;
-        instructorSelect.value = course.instructor_id;
-        levelInput.value = course.level || '';
-        durationInput.value = course.duration || '';
-        topicsInput.value = (course.topics || []).join('\n');
-        publishedCheck.checked = course.is_published;
-        if (course.thumbnail) {
-            previewImg.src = '/storage/' + course.thumbnail;
-            preview.style.display = '';
-        } else {
-            preview.style.display = 'none';
+        function resetForm() {
+            form.action = '{{ route('admin.courses.store') }}';
+            methodInput.value = 'POST';
+            form.querySelectorAll('input, textarea, select').forEach(function(el) {
+                if (el.type === 'checkbox') { el.checked = el.defaultChecked; }
+                else if (el.type === 'file') { el.value = ''; }
+                else if (el.type !== 'hidden') { el.value = ''; }
+            });
+            if (instructorSelect) instructorSelect.value = '';
+            if (preview) preview.style.display = 'none';
+            if (previewImg) previewImg.src = '';
+            if (modalTitle) modalTitle.textContent = 'Create Course';
+            if (modalIcon) modalIcon.textContent = '📚';
+            if (submitBtn) submitBtn.textContent = 'Create Course';
         }
-        modalTitle.textContent = 'Edit Course';
-        modalIcon.textContent = '✏️';
-        submitBtn.textContent = 'Update Course';
-    }
 
-    function openModal() {
-        modal.classList.remove('hidden');
-        document.body.style.overflow = 'hidden';
-    }
-
-    function closeModalFn() {
-        modal.classList.add('hidden');
-        document.body.style.overflow = '';
-    }
-
-    document.getElementById('createCourseBtn').addEventListener('click', function() {
-        resetForm();
-        openModal();
-    });
-
-    document.querySelectorAll('.btn-action-edit').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            var course = JSON.parse(btn.getAttribute('data-course'));
-            fillForm(course);
-            openModal();
-        });
-    });
-
-    thumbnailInput.addEventListener('change', function() {
-        if (this.files && this.files[0]) {
-            var reader = new FileReader();
-            reader.onload = function(e) { previewImg.src = e.target.result; preview.style.display = ''; };
-            reader.readAsDataURL(this.files[0]);
-        } else {
-            preview.style.display = 'none';
+        function fillForm(course) {
+            form.action = '/admin/courses/' + course.id;
+            methodInput.value = 'PATCH';
+            if (titleInput) titleInput.value = course.title;
+            if (categoryInput) categoryInput.value = course.category;
+            if (descInput) descInput.value = course.description;
+            if (priceInput) priceInput.value = course.price;
+            if (instructorSelect) instructorSelect.value = course.instructor_id;
+            if (levelInput) levelInput.value = course.level || '';
+            if (durationInput) durationInput.value = course.duration || '';
+            if (topicsInput) topicsInput.value = (course.topics || []).join('\n');
+            if (publishedCheck) publishedCheck.checked = course.is_published;
+            if (course.thumbnail) {
+                if (previewImg) previewImg.src = '/storage/' + course.thumbnail;
+                if (preview) preview.style.display = '';
+            } else {
+                if (preview) preview.style.display = 'none';
+            }
+            if (modalTitle) modalTitle.textContent = 'Edit Course';
+            if (modalIcon) modalIcon.textContent = '✏️';
+            if (submitBtn) submitBtn.textContent = 'Update Course';
         }
-    });
 
-    document.getElementById('generateWithAI').addEventListener('click', function() {
-        var title = titleInput.value.trim();
-        var category = categoryInput.value.trim();
-        if (!title) { alert('Enter a course title first.'); return; }
-        var btn = this;
-        btn.disabled = true;
-        btn.textContent = 'Generating...';
-        fetch('{{ route('ai.suggest.course') }}', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-            body: JSON.stringify({ title: title, category: category || null })
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.description) descInput.value = data.description;
-            if (data.topics && data.topics.length) topicsInput.value = data.topics.join('\n');
-            if (data.level) levelInput.value = data.level;
-            if (data.duration) durationInput.value = data.duration;
-        })
-        .catch(function() { alert('AI generation failed.'); })
-        .finally(function() { btn.disabled = false; btn.textContent = '✨ Generate with AI'; });
-    });
+        function openModal() {
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
 
-    document.getElementById('courseModalClose').addEventListener('click', closeModalFn);
-    document.getElementById('courseModalCancel').addEventListener('click', closeModalFn);
-    modal.addEventListener('click', function(e) { if (e.target === modal) closeModalFn(); });
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModalFn();
-    });
+        function closeModalFn() {
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        var createBtn = document.getElementById('createCourseBtn');
+        if (createBtn) {
+            createBtn.addEventListener('click', function() {
+                resetForm();
+                openModal();
+            });
+        }
+
+        document.querySelectorAll('.btn-action-edit').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                try {
+                    var course = JSON.parse(btn.getAttribute('data-course'));
+                    fillForm(course);
+                    openModal();
+                } catch (e) {
+                    console.error('Failed to parse course data:', e);
+                }
+            });
+        });
+
+        if (thumbnailInput) {
+            thumbnailInput.addEventListener('change', function() {
+                if (this.files && this.files[0]) {
+                    var reader = new FileReader();
+                    reader.onload = function(e) { if (previewImg) previewImg.src = e.target.result; if (preview) preview.style.display = ''; };
+                    reader.readAsDataURL(this.files[0]);
+                } else {
+                    if (preview) preview.style.display = 'none';
+                }
+            });
+        }
+
+        var aiBtn = document.getElementById('generateWithAI');
+        if (aiBtn) {
+            aiBtn.addEventListener('click', function() {
+                var title = titleInput ? titleInput.value.trim() : '';
+                var category = categoryInput ? categoryInput.value.trim() : '';
+                if (!title) { alert('Enter a course title first.'); return; }
+                var btn = this;
+                btn.disabled = true;
+                btn.textContent = 'Generating...';
+                fetch('{{ route('ai.suggest.course') }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ title: title, category: category || null })
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.description && descInput) descInput.value = data.description;
+                    if (data.topics && data.topics.length && topicsInput) topicsInput.value = data.topics.join('\n');
+                    if (data.level && levelInput) levelInput.value = data.level;
+                    if (data.duration && durationInput) durationInput.value = data.duration;
+                })
+                .catch(function() { alert('AI generation failed.'); })
+                .finally(function() { btn.disabled = false; btn.textContent = '✨ Generate with AI'; });
+            });
+        }
+
+        var closeBtn = document.getElementById('courseModalClose');
+        if (closeBtn) closeBtn.addEventListener('click', closeModalFn);
+        var cancelBtn = document.getElementById('courseModalCancel');
+        if (cancelBtn) cancelBtn.addEventListener('click', closeModalFn);
+        modal.addEventListener('click', function(e) { if (e.target === modal) closeModalFn(); });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModalFn();
+        });
+    } catch (e) {
+        console.error('Course modal init failed:', e);
+    }
 })();
 </script>
 

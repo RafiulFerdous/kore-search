@@ -13,7 +13,7 @@ class StudentController extends Controller
     {
         $student = Auth::user();
         $purchasedCourseIds = Order::where('user_id', $student->id)->where('status', 'completed')->pluck('course_id');
-        $courses = Course::whereIn('id', $purchasedCourseIds)->get();
+        $courses = Course::with('instructor')->whereIn('id', $purchasedCourseIds)->get();
         $totalSpent = Order::where('user_id', $student->id)->where('status', 'completed')->sum('amount');
         $ordersCount = Order::where('user_id', $student->id)->count();
 
@@ -24,7 +24,7 @@ class StudentController extends Controller
     {
         $student = Auth::user();
         $purchasedCourseIds = Order::where('user_id', $student->id)->where('status', 'completed')->pluck('course_id');
-        $courses = Course::whereIn('id', $purchasedCourseIds)->get();
+        $courses = Course::with('instructor')->whereIn('id', $purchasedCourseIds)->get();
 
         return view('dashboard.student.courses', compact('courses'));
     }

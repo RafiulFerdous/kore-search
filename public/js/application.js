@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    function showToast(message, type) {
+    window.showToast = function showToast(message, type) {
         type = type || 'info';
 
         var container = document.getElementById('toastContainer');

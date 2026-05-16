@@ -89,6 +89,7 @@
     </div>
 </section>
 
+@guest
 <section class="cta-section">
     <div class="container">
         <div class="cta-box">
@@ -98,5 +99,6 @@
         </div>
     </div>
 </section>
+@endguest
 
 @endsection

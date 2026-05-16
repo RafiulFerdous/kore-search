@@ -10,13 +10,18 @@ use App\Http\Controllers\AIController;
 use App\Http\Controllers\CourseRatingController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\AdminController;
+use App\Http\Controllers\Admin\AdminCourseController;
+use App\Http\Controllers\Admin\AdminOrderController;
+use App\Http\Controllers\Admin\AdminSettingController;
+use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Instructor\InstructorController;
 use App\Http\Controllers\Student\StudentController;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
 
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+Route::post('/login', [AuthController::class, 'login']);
+Route::get('/login/throttled', [AuthController::class, 'showThrottled'])->name('login.throttled');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:3,1');
@@ -42,22 +47,26 @@ Route::middleware(['auth'])->group(function () {
 
     Route::middleware(['role:admin'])->prefix('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
-        Route::get('/users', [AdminController::class, 'users'])->name('users');
-        Route::get('/courses', [AdminController::class, 'courses'])->name('courses');
-        Route::get('/orders', [AdminController::class, 'orders'])->name('orders');
-        Route::post('/users', [AdminController::class, 'storeUser'])->name('users.store');
-        Route::patch('/users/{user}/role', [AdminController::class, 'updateRole'])->name('users.role');
-        Route::patch('/users/{user}/password', [AdminController::class, 'updatePassword'])->name('users.password');
-        Route::delete('/users/{user}', [AdminController::class, 'destroyUser'])->name('users.destroy');
-        Route::post('/courses', [AdminController::class, 'storeCourse'])->name('courses.store');
-        Route::patch('/courses/{course}', [AdminController::class, 'updateCourse'])->name('courses.update');
-        Route::delete('/courses/{course}', [AdminController::class, 'destroyCourse'])->name('courses.destroy');
+
+        Route::get('/users', [AdminUserController::class, 'index'])->name('users');
+        Route::post('/users', [AdminUserController::class, 'store'])->name('users.store');
+        Route::patch('/users/{user}/role', [AdminUserController::class, 'updateRole'])->name('users.role');
+        Route::patch('/users/{user}/password', [AdminUserController::class, 'updatePassword'])->name('users.password');
+        Route::delete('/users/{user}', [AdminUserController::class, 'destroy'])->name('users.destroy');
+
+        Route::get('/courses', [AdminCourseController::class, 'index'])->name('courses');
+        Route::post('/courses', [AdminCourseController::class, 'store'])->name('courses.store');
+        Route::patch('/courses/{course}', [AdminCourseController::class, 'update'])->name('courses.update');
+        Route::delete('/courses/{course}', [AdminCourseController::class, 'destroy'])->name('courses.destroy');
+
+        Route::get('/orders', [AdminOrderController::class, 'index'])->name('orders');
+        Route::patch('/orders/{order}/status', [AdminOrderController::class, 'updateStatus'])->name('orders.status');
 
         Route::prefix('settings')->name('settings.')->group(function () {
-            Route::get('/hero', [AdminController::class, 'heroSettings'])->name('hero');
-            Route::patch('/hero', [AdminController::class, 'updateHeroSettings'])->name('hero.update');
-            Route::get('/featured', [AdminController::class, 'featuredSettings'])->name('featured');
-            Route::patch('/featured', [AdminController::class, 'updateFeaturedSettings'])->name('featured.update');
+            Route::get('/hero', [AdminSettingController::class, 'hero'])->name('hero');
+            Route::patch('/hero', [AdminSettingController::class, 'updateHero'])->name('hero.update');
+            Route::get('/featured', [AdminSettingController::class, 'featured'])->name('featured');
+            Route::patch('/featured', [AdminSettingController::class, 'updateFeatured'])->name('featured.update');
         });
     });
 

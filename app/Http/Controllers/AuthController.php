@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Cache\RateLimiter;
 
 class AuthController extends Controller
 {
@@ -14,21 +15,42 @@ class AuthController extends Controller
         return view('auth.login');
     }
 
-    public function login(Request $request)
+    protected function rateLimitKey(Request $request): string
+    {
+        return 'login|' . strtolower($request->email) . '|' . $request->ip();
+    }
+
+    public function login(Request $request, RateLimiter $limiter)
     {
         $credentials = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required'],
         ]);
 
+        $key = $this->rateLimitKey($request);
+
+        if ($limiter->tooManyAttempts($key, 5)) {
+            $seconds = $limiter->availableIn($key);
+            return redirect()->route('login.throttled', ['seconds' => $seconds]);
+        }
+
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
+            $limiter->clear($key);
             $request->session()->regenerate();
             return redirect()->intended(route('dashboard'));
         }
 
+        $limiter->hit($key, 60);
+
         return back()->withErrors([
             'email' => 'The provided credentials do not match our records.',
         ])->onlyInput('email');
+    }
+
+    public function showThrottled(Request $request)
+    {
+        $seconds = max((int) $request->seconds, 60);
+        return view('auth.throttled', ['seconds' => $seconds]);
     }
 
     public function showRegister()

@@ -32,7 +32,6 @@
                             <label class="featured-course-item {{ in_array($course->id, $selectedIds) ? 'selected' : '' }}">
                                 <input type="checkbox" name="course_ids[]" value="{{ $course->id }}"
                                     {{ in_array($course->id, $selectedIds) ? 'checked' : '' }}
-                                    onchange="this.parentElement.classList.toggle('selected')"
                                     class="featured-course-checkbox">
                                 <img src="{{ $course->thumbnail ?? 'https://placehold.co/80x60' }}"
                                     alt="" class="featured-course-thumb"
@@ -46,6 +45,11 @@
                             <p class="empty-state">No published courses available.</p>
                         @endforelse
                     </div>
+
+                    <div style="margin-top:20px;">
+                        {{ $courses->links('vendor.pagination.custom') }}
+                    </div>
+
                     @error('course_ids')<span class="field-error">{{ $message }}</span>@enderror
                     <span id="courseCountMsg" class="form-hint" style="margin-top:12px;display:block;"></span>
                 </div>
@@ -61,33 +65,93 @@
 @push('scripts')
 <script>
 (function() {
+    var STORAGE_KEY = 'featured_selected';
     var checkboxes = document.querySelectorAll('.featured-course-checkbox');
     var msg = document.getElementById('courseCountMsg');
+    var form = document.querySelector('form');
     var max = 6;
 
-    function updateCount() {
-        var checked = document.querySelectorAll('.featured-course-checkbox:checked').length;
+    function getSelected() {
+        try { return new Set(JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '[]')); } catch(e) { return new Set(); }
+    }
+
+    function saveSelected(selected) {
+        try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(selected))); } catch(e) {}
+    }
+
+    function updateCount(showToastMsg) {
+        var count = getSelected().size;
         if (msg) {
-            if (checked === 0) {
+            if (count === 0) {
                 msg.textContent = 'None selected — random courses will be shown on the homepage.';
-            } else if (checked >= max) {
+            } else if (count >= max) {
                 msg.textContent = 'Maximum ' + max + ' courses selected. Uncheck one to select another.';
             } else {
-                msg.textContent = checked + ' of ' + max + ' selected.';
+                msg.textContent = count + ' of ' + max + ' selected.';
             }
         }
+        if (showToastMsg && count >= max && typeof showToast === 'function') {
+            showToast('Maximum ' + max + ' courses selected. Uncheck one to select another.', 'warning');
+        }
+    }
+
+    function restoreCheckboxes() {
+        var selected = getSelected();
         checkboxes.forEach(function(cb) {
-            if (!cb.checked) {
-                cb.disabled = checked >= max;
+            if (selected.has(cb.value)) {
+                cb.checked = true;
+                cb.parentElement.classList.add('selected');
+            } else {
+                cb.checked = false;
+                cb.parentElement.classList.remove('selected');
             }
         });
     }
 
+    if (sessionStorage.getItem(STORAGE_KEY) === null) {
+        var initial = new Set();
+        checkboxes.forEach(function(cb) { if (cb.checked) initial.add(cb.value); });
+        saveSelected(initial);
+    }
+
     checkboxes.forEach(function(cb) {
-        cb.addEventListener('change', updateCount);
+        cb.addEventListener('change', function() {
+            var selected = getSelected();
+            if (this.checked) {
+                if (selected.size >= max) {
+                    this.checked = false;
+                    this.parentElement.classList.remove('selected');
+                    if (typeof showToast === 'function') {
+                        showToast('You can select up to ' + max + ' courses only.', 'warning');
+                    }
+                    return;
+                }
+                selected.add(this.value);
+            } else {
+                selected.delete(this.value);
+            }
+            saveSelected(selected);
+            this.parentElement.classList.toggle('selected');
+            updateCount(true);
+        });
     });
 
-    updateCount();
+    form.addEventListener('submit', function() {
+        var selected = getSelected();
+        var visibleIds = new Set(Array.from(checkboxes).map(function(cb) { return cb.value; }));
+        selected.forEach(function(id) {
+            if (!visibleIds.has(id)) {
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'course_ids[]';
+                input.value = id;
+                form.appendChild(input);
+            }
+        });
+    });
+
+    restoreCheckboxes();
+    updateCount(false);
 })();
 </script>
 @endpush
