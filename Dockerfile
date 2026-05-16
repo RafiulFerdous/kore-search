@@ -13,10 +13,24 @@ RUN composer install \
     --prefer-dist
 
 
+# =====================================================
+# NODE BUILD STAGE (🔥 FIX FOR CSS/JS - LARAVEL 13)
+# =====================================================
+FROM node:20 AS node
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+RUN npm run build
+
+
 FROM php:8.3-fpm-alpine
 
 # =====================================================
-# System dependencies (IMPORTANT: CA certificates added)
+# System dependencies
 # =====================================================
 RUN apk add --no-cache \
     ca-certificates \
@@ -61,6 +75,13 @@ WORKDIR /var/www/html
 # ==========================
 COPY --chown=www-data:www-data . .
 COPY --from=vendor --chown=www-data:www-data /build/vendor vendor
+
+# 🔥 COPY VITE BUILD OUTPUT (IMPORTANT FIX FOR CSS/JS)
+COPY --from=node /app/public/build /var/www/html/public/build
+
+# ==========================
+# Certificates (TiDB SSL fix)
+# ==========================
 COPY docker/certs/isrgrootx1.pem /var/www/html/docker/certs/isrgrootx1.pem
 
 # ==========================
