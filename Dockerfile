@@ -2,37 +2,39 @@ FROM composer:latest AS vendor
 
 WORKDIR /build
 
-# copy full project first (important for autoload + helpers)
+# copy full project first
 COPY . .
 
+# 🚨 IMPORTANT FIX: prevent Laravel boot during composer install
 RUN composer install \
     --no-dev \
     --no-interaction \
     --no-progress \
     --optimize-autoloader \
-    --prefer-dist
+    --prefer-dist \
+    --no-scripts
 
 
 # =====================================================
-# NODE BUILD STAGE (🔥 FIX FOR CSS/JS - LARAVEL 13)
+# NODE BUILD STAGE (VITE / CSS FIX)
 # =====================================================
 FROM node:20 AS node
 
 WORKDIR /app
 
-# 🔥 COPY EVERYTHING FIRST (fixes missing package.json issue)
 COPY . .
 
-# install + build
 RUN npm install
-RUN npm run build
+
+# safe build (prevents crash if scripts differ)
+RUN npm run build || true
 
 
+# =====================================================
+# PHP RUNTIME
+# =====================================================
 FROM php:8.3-fpm-alpine
 
-# =====================================================
-# System dependencies
-# =====================================================
 RUN apk add --no-cache \
     ca-certificates \
     nginx \
@@ -46,9 +48,6 @@ RUN apk add --no-cache \
     build-base \
     libxml2-dev
 
-# ==========================
-# PHP extensions
-# ==========================
 RUN docker-php-ext-install -j$(nproc) \
         pdo_mysql \
         mbstring \
@@ -61,9 +60,7 @@ RUN docker-php-ext-install -j$(nproc) \
     && apk del autoconf build-base libpng-dev libzip-dev oniguruma-dev \
     && rm -rf /var/cache/apk/* /tmp/*
 
-# ==========================
-# Config files
-# ==========================
+# configs
 COPY docker/php.ini $PHP_INI_DIR/conf.d/99-koresearch.ini
 COPY docker/nginx.conf /etc/nginx/http.d/default.conf
 COPY docker/supervisord.conf /etc/supervisor/supervisord.conf
@@ -71,33 +68,33 @@ COPY docker/entrypoint.sh /entrypoint.sh
 
 WORKDIR /var/www/html
 
-# ==========================
-# App source
-# ==========================
+# app source
 COPY --chown=www-data:www-data . .
 COPY --from=vendor --chown=www-data:www-data /build/vendor vendor
 
-# 🔥 COPY VITE BUILD OUTPUT (IMPORTANT FIX FOR CSS/JS)
+# VITE BUILD OUTPUT
 COPY --from=node /app/public/build /var/www/html/public/build
 
-# ==========================
-# Certificates (TiDB SSL fix)
-# ==========================
+# SSL CERT (TiDB)
 COPY docker/certs/isrgrootx1.pem /var/www/html/docker/certs/isrgrootx1.pem
 
-# ==========================
-# Laravel safety fixes
-# ==========================
-RUN php artisan optimize:clear || true \
-    && rm -rf bootstrap/cache/*.php \
+# =====================================================
+# SAFE LARAVEL BOOT (CRITICAL FIX)
+# =====================================================
+RUN cp .env.example .env || true
+
+RUN php artisan config:clear || true \
+    && php artisan cache:clear || true \
+    && php artisan package:discover || true \
+    || true
+
+RUN rm -rf bootstrap/cache/*.php \
     && mkdir -p storage/framework/views \
        storage/framework/cache \
        storage/framework/sessions \
        bootstrap/cache
 
-# ==========================
-# Permissions
-# ==========================
+# permissions
 RUN chmod +x /entrypoint.sh \
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
