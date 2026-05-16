@@ -61,6 +61,7 @@ WORKDIR /var/www/html
 # ==========================
 COPY --chown=www-data:www-data . .
 COPY --from=vendor --chown=www-data:www-data /build/vendor vendor
+COPY docker/certs/isrgrootx1.pem /var/www/html/docker/certs/isrgrootx1.pem
 
 # ==========================
 # Laravel safety fixes
