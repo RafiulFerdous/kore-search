@@ -11,7 +11,7 @@ return [
 
     'debug' => (bool) env('APP_DEBUG', false),
 
-    'url' => env('APP_URL', 'http://localhost'),
+    'url' => env('APP_URL'),
 
     'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
 
