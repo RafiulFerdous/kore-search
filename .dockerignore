@@ -1,0 +1,15 @@
+/.git
+/.idea
+/.vscode
+/vendor
+/node_modules
+/storage/framework/cache/data
+/storage/framework/sessions
+/storage/framework/views
+/storage/logs
+/storage/debugbar
+/.env
+docker-compose*.yml
+*.md
+.gitignore
+.gitattributes

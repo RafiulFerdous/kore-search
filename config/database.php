@@ -27,12 +27,12 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
-              'options' => extension_loaded('pdo_mysql') ? array_filter([
-                    PDO::MYSQL_ATTR_SSL_CA => storage_path('certs/isrgrootx1.pem'),
-                ]) : [],
-//             'options' => extension_loaded('pdo_mysql') ? array_filter([
-//                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-//             ]) : [],
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => env('MYSQL_ATTR_SSL_VERIFY_SERVER_CERT'),
+                PDO::MYSQL_ATTR_SSL_KEY => env('MYSQL_ATTR_SSL_KEY'),
+                PDO::MYSQL_ATTR_SSL_CERT => env('MYSQL_ATTR_SSL_CERT'),
+            ], fn($v) => $v !== null && $v !== '') : [],
         ],
         'pgsql' => [
             'driver' => 'pgsql',
@@ -56,7 +56,6 @@ return [
             'database' => env('DB_DATABASE', 'forge'),
             'username' => env('DB_USERNAME', 'forge'),
             'password' => env('DB_PASSWORD', ''),
-            'charset' => 'utf8',
             'prefix' => '',
             'prefix_indexes' => true,
         ],
