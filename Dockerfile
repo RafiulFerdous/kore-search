@@ -13,7 +13,7 @@ RUN composer install \
     --optimize-autoloader \
     --prefer-dist
 
-FROM php:8.2-fpm-alpine
+FROM php:8.3-fpm-alpine
 
 RUN apk add --no-cache \
     nginx \
