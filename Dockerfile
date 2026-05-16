@@ -23,6 +23,8 @@ RUN apk add --no-cache \
     libpng-dev \
     libzip-dev \
     oniguruma-dev \
+    autoconf \
+    build-base \
     $([ "$(uname -m)" = "x86_64" ] && echo "libxml2-dev") \
     && docker-php-ext-install -j$(nproc) \
         pdo_mysql \
@@ -33,7 +35,7 @@ RUN apk add --no-cache \
         xml \
     && pecl install redis \
     && docker-php-ext-enable redis \
-    && apk del libpng-dev libzip-dev oniguruma-dev \
+    && apk del autoconf build-base libpng-dev libzip-dev oniguruma-dev \
     && rm -rf /var/cache/apk/* /tmp/*
 
 COPY docker/php.ini $PHP_INI_DIR/conf.d/99-koresearch.ini
