@@ -2,8 +2,11 @@
 set -e
 
 # If PORT is set by Render/Railway, replace nginx listen port
+NGINX_CONF="/etc/nginx/http.d/default.conf"
 if [ -n "$PORT" ] && [ "$PORT" != "8080" ]; then
-    sed -i "s/listen 8080;/listen $PORT;/" /etc/nginx/sites-enabled/default
+    if [ -f "$NGINX_CONF" ]; then
+        sed -i "s/listen 8080;/listen $PORT;/" "$NGINX_CONF"
+    fi
 fi
 
 # Ensure storage directories exist with proper permissions
