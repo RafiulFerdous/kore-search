@@ -20,10 +20,11 @@ FROM node:20 AS node
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install
-
+# 🔥 COPY EVERYTHING FIRST (fixes missing package.json issue)
 COPY . .
+
+# install + build
+RUN npm install
 RUN npm run build
 
 
