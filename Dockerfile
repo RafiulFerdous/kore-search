@@ -2,7 +2,10 @@ FROM composer:latest AS vendor
 
 WORKDIR /build
 
-COPY composer.json composer.lock ./
+
+COPY app/helpers.php app/helpers.php
+COPY . .
+
 RUN composer install \
     --no-dev \
     --no-interaction \
