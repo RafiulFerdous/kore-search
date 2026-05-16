@@ -5,7 +5,7 @@ WORKDIR /build
 # copy full project first
 COPY . .
 
-# 🚨 IMPORTANT FIX: prevent Laravel boot during composer install
+
 RUN composer install \
     --no-dev \
     --no-interaction \
@@ -15,9 +15,7 @@ RUN composer install \
     --no-scripts
 
 
-# =====================================================
-# NODE BUILD STAGE (VITE / CSS FIX)
-# =====================================================
+
 FROM node:20 AS node
 
 WORKDIR /app
@@ -78,9 +76,6 @@ COPY --from=node /app/public/build /var/www/html/public/build
 # SSL CERT (TiDB)
 COPY docker/certs/isrgrootx1.pem /var/www/html/docker/certs/isrgrootx1.pem
 
-# =====================================================
-# SAFE LARAVEL BOOT (CRITICAL FIX)
-# =====================================================
 RUN cp .env.example .env || true
 
 RUN php artisan config:clear || true \

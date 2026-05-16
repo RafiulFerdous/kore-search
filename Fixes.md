@@ -1,10 +1,24 @@
 # KoreSearch LMS — Job Assessment Answers
 
-## 1. How did you find the bugs?
+## New Features & Improvements
+
+- **Role-Based Access Control (RBAC)** — Implemented Spatie Laravel Permission with three roles (admin, instructor, student), each with granular permissions (`view dashboard`, `manage courses`, `manage users`, `view orders`, `purchase courses`). Dedicated dashboards per role with separate controllers and views.
+- **Redis Cache** — Configured Redis as the default cache driver. Course listings, course detail pages, admin course/user lists, and featured sections are all cached with version-based invalidation.
+- **Cache Invalidation via Observers** — `CourseObserver` and `UserObserver` automatically bust relevant caches on `saved`/`deleted` events — no more stale data or manual `Cache::forget()` calls scattered across controllers.
+- **Try-Catch + DB Transactions** — All write operations (checkout, registration, course CRUD) wrapped in `DB::transaction()` with proper rollback on failure and user-friendly error messages.
+- **Rate Limiting** — Login routes throttled to 5 attempts per minute via both route middleware (`throttle:5,1`) and inline `RateLimiter`. Registration limited to 3 attempts per minute.
+- **AI Service Integration** — Pluggable AI service (Ollama or demo provider) that auto-generates course descriptions, topic lists, difficulty levels, and duration estimates when uploading courses from the admin dashboard.
+- **UI/UX Improvements** — Toast notification system replacing old flash alerts, redesigned course cards with hover overlays and price ribbons, star rating widget with modal review form, dynamic hero section managed from admin settings, separated header/footer partials, responsive cart with AJAX add/remove and price-change detection, paginated course listing with active filter chips and sort options.
+- **Laravel 10 → 13 Upgrade** — Upgraded the entire framework across three major versions. Removed deprecated `Http\Kernel`, `Exceptions\Handler`, `Console\Kernel`, and `RouteServiceProvider` in favour of Laravel 11+'s `bootstrap/app.php` fluent API.
+- **Docker for deploy on render** —  try to deploy on render with docker as render has no php runtime support.But can not successful deployment for time.will try later.
+
+## 1. How did i find the bugs?
 
 Started by running `php artisan serve` and clicking through every page. The app crashed immediately — missing `artisan`, `bootstrap/app.php`, `public/index.php`, and half the config directory. That was the first red flag: the project was shipped without the Laravel skeleton.
 
-Once I got a white screen to render, I enabled debug mode and used `php artisan route:list` to check routes, `php artisan migrate --pretend` to see if migrations would run, and checked Laravel logs. The debugbar was a huge help for finding N+1 queries and missing eager loads on the course listing and dashboard pages.
+
+
+I enabled debug mode and used `php artisan route:list` to check routes, `php artisan migrate --pretend` to see if migrations would run, and checked Laravel logs. The **Laravel Debugbar** (`barryvdh/laravel-debugbar`) was a huge help for finding N+1 queries and missing eager loads on the course listing and dashboard pages — the Database and Models tabs made it trivial to spot repeated queries inside loops.
 
 For the cart bugs, I traced session data dumps in the views with `@dump(session()->all())`. That's how I spotted the price mismatch problem — the cart stored only IDs, so prices were read live from the database on every page load. If an admin changed a price mid-session, the user would see a different number at checkout than when they added it.
 
@@ -54,12 +68,8 @@ A few things I'd improve if given more time:
 
 - **CSRF on AJAX** — The current JS reads CSRF token from a `<meta>` tag, which works but the Laravel convention is the `XSRF-TOKEN` cookie. Not a bug, just worth aligning with framework conventions.
 
-- **Query performance** — The admin course list caches with `admin.courses.version` but doesn't bust that version when courses change outside the admin controller (e.g., instructor creates a course). A cache tag approach (`Cache::tags(['courses'])`) would be cleaner, but tags don't work with file/database cache drivers — only Redis/Memcached.
+- **Query performance** — The admin course list caches with `admin.courses.version` but doesn't bust that version when courses change outside the admin controller (e.g., instructor creates a course). A cache tag approach (`Cache::tags(['courses'])`) would be cleaner.
 
-- **Pagination on filters** — The course filter page stores filters in the query string but if someone bookmarks `/courses?category=Backend&page=2`, it works fine. However, removing a filter resets to page 1, which is correct but could be more explicit.
+- **Ollama dependency** — The AI feature defaults to a demo provider (no API needed), which is smart. The Ollama integration works but requires the user to have Ollama running locally. Not everyone will set that up, so keeping the demo fallback was a good call.A better ai api needed for implementation.
 
-- **Role separation in seeders** — The `DatabaseSeeder` still sets the raw `role` column AND assigns a Spatie role. The `role` column is redundant now that Spatie manages roles. A future cleanup could drop that column and rely entirely on Spatie's `model_has_roles` table.
-
-- **Ollama dependency** — The AI feature defaults to a demo provider (no API needed), which is smart. The Ollama integration works but requires the user to have Ollama running locally. Not everyone will set that up, so keeping the demo fallback was a good call.
-
-- **Eager loading** — Added `Course::with('instructor')` to the main query in `CourseController::index()` at `app/Http/Controllers/CourseController.php:23`. Also added `with('course', 'user')` and `with('course')` in `CheckoutController::confirmation()` at `app/Http/Controllers/CheckoutController.php:87-91`. These were plain N+1 bugs before.
+- **Notification System** - A notification system would implemented if time available.

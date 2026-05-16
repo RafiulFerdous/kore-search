@@ -29,10 +29,7 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-                PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => env('MYSQL_ATTR_SSL_VERIFY_SERVER_CERT'),
-                PDO::MYSQL_ATTR_SSL_KEY => env('MYSQL_ATTR_SSL_KEY'),
-                PDO::MYSQL_ATTR_SSL_CERT => env('MYSQL_ATTR_SSL_CERT'),
-            ], fn($v) => $v !== null && $v !== '') : [],
+            ]) : [],
         ],
         'pgsql' => [
             'driver' => 'pgsql',
@@ -56,40 +53,33 @@ return [
             'database' => env('DB_DATABASE', 'forge'),
             'username' => env('DB_USERNAME', 'forge'),
             'password' => env('DB_PASSWORD', ''),
+            'charset' => 'utf8',
             'prefix' => '',
             'prefix_indexes' => true,
         ],
     ],
     'migrations' => 'migrations',
-   'redis' => [
-       'client' => env('REDIS_CLIENT', 'phpredis'),
-
-       'options' => [
-           'cluster' => env('REDIS_CLUSTER', null),
-
-           'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_').'_database_'),
-
-           // 🔥 IMPORTANT for Upstash TLS stability
-           'ssl' => [
-               'verify_peer' => false,
-               'verify_peer_name' => false,
-           ],
-       ],
-
-       'default' => [
-           'host' => env('REDIS_HOST'),
-           'password' => env('REDIS_PASSWORD'),
-           'port' => env('REDIS_PORT', 6379),
-           'database' => env('REDIS_DB', 0),
-           'scheme' => env('REDIS_SCHEME', 'tls'),
-       ],
-
-       'cache' => [
-           'host' => env('REDIS_HOST'),
-           'password' => env('REDIS_PASSWORD'),
-           'port' => env('REDIS_PORT', 6379),
-           'database' => env('REDIS_CACHE_DB', 1),
-           'scheme' => env('REDIS_SCHEME', 'tls'),
-       ],
-   ],
+    'redis' => [
+        'client' => env('REDIS_CLIENT', 'phpredis'),
+        'options' => [
+            'cluster' => env('REDIS_CLUSTER', 'redis'),
+            'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_').'_database_'),
+        ],
+        'default' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_PORT', '6379'),
+            'database' => env('REDIS_DB', '0'),
+        ],
+        'cache' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_PORT', '6379'),
+            'database' => env('REDIS_CACHE_DB', '1'),
+        ],
+    ],
 ];
