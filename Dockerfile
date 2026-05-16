@@ -2,10 +2,8 @@ FROM composer:latest AS vendor
 
 WORKDIR /build
 
-
+COPY composer.json composer.lock ./
 COPY app/helpers.php app/helpers.php
-COPY . .
-
 RUN composer install \
     --no-dev \
     --no-interaction \
@@ -50,7 +48,9 @@ COPY --from=vendor --chown=www-data:www-data /build/vendor vendor
 
 RUN chmod +x /entrypoint.sh \
     && chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache \
+    && rm -f /var/www/html/bootstrap/cache/packages.php \
+           /var/www/html/bootstrap/cache/services.php
 
 EXPOSE 8080
 

@@ -4,6 +4,8 @@
 /vendor
 /node_modules
 /.env
+/bootstrap/cache/packages.php
+/bootstrap/cache/services.php
 docker-compose*.yml
 *.md
 .gitignore
